@@ -5,7 +5,7 @@
 SaaS multi-tenant para gestión de clínicas dentales y médicas en Guatemala.
 Stack: Next.js 14 + TypeScript + Tailwind CSS + Supabase (PostgreSQL).
 Mercado: Guatemala — español guatemalteco en toda la UI.
-Desarrollador: Arturo Monterroso (Visual K) — analista senior, no programador activo.
+Desarrollador: Arturo Ramirez (Strategic Solutions) — analista senior, no programador activo.
 
 ---
 
@@ -291,5 +291,5 @@ NIT: formato ######-# (7 dígitos + verificador)
 
 ---
 
-*CLAUDE.md v1.0 — ClinicaApp · Visual K · Guatemala · Marzo 2026*
+*CLAUDE.md v1.0 — ClinicaApp · Strategic Solutions · Guatemala · Marzo 2026*
 *Reemplazar este archivo cuando cambien las convenciones del proyecto*

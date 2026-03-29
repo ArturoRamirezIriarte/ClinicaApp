@@ -1,0 +1,21 @@
+INSERT INTO empresas (
+  nombre, email_contacto, app, plan, estado
+) VALUES (
+  'Clínica Dental Demo',
+  'demo@clinicaapp.com',
+  'clinica',
+  'estandar',
+  'trial'
+);
+
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO anon;
+GRANT ALL ON SCHEMA public TO authenticated;
+GRANT ALL ON SCHEMA public TO service_role;
+
+
+SELECT column_name FROM information_schema.columns
+WHERE table_name = 'empresas'
+ORDER BY ordinal_position;

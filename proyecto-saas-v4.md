@@ -1,5 +1,5 @@
 # Proyecto SaaS — Definición de Arquitectura y Alcance
-**Arturo Monterroso · Visual K · Guatemala**
+**Arturo Ramirez · Strategic Solutions · Guatemala**
 *Versión 4.0 — Marzo 2026*
 
 > **Cambios v4.0:** Schema completo de ClinicaApp definido y documentado. Incluye suscripciones, pacientes, citas, expediente clínico, odontograma por caras con historial, cobros, FEL SAT Guatemala, inventario, notificaciones y seguridad multicapa. ClinicaApp se desarrolla primero.
@@ -1088,4 +1088,4 @@ Eres el asistente técnico principal para ClinicaApp y CreditoApp.
 
 ---
 
-*Documento v4.0 — Reemplaza v3.0 completamente · Visual K SaaS Initiative · Marzo 2026*
+*Documento v4.0 — Reemplaza v3.0 completamente · Strategic Solutions SaaS Initiative · Marzo 2026*
