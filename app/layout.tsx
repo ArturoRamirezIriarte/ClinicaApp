@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { PermisosProvider } from '@/context/PermisosContext'
 import './globals.css'
 
 const inter = Inter({
@@ -19,7 +20,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${inter.className} h-full`}>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <PermisosProvider>{children}</PermisosProvider>
+      </body>
     </html>
   )
 }

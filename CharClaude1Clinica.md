@@ -6145,7 +6145,1106 @@ The "+ Nuevo Paciente" button exists in the patient list. Now make it work compl
 7. Use Clinical Trust design system from CLAUDE.md
 Presiona Enter y dime qué aparece.
 
-EN LA EMPRESA DEBE HABER UN CAMPO DE REGIMEN TRIBUTARIO Y OTRO CON PORCENTAJE SOBRE FACTURA, PARA HACER UNA PEQUEÑA DECLARACION MENSUAL DE IMPUESTOS (ISR) NO SOLO COBRAR EL IVA, TAMBIEN AGREGAR EN LA TABLA DE EMPRESA PORCENTAJE DE IVA (IMPUESTO SOBRE FACTURA)
-DEBE HABER EN EL EXPEDIENTE DONDE ADJUNTAR ARCHIVOS PARA LLEVAR CONTROL COMO RAYOS X O PDF DE DIAGNOSTICOS
-DEBE HABER UN CONTROL DE MEDICOS EN EL MENU
-DEBE HABER UN CONTROL DE ROLES QUE USUARIOS PUEDEN VER QUE OPCIONES DEL MENU
+Plan de Trabajo — Módulo Reportes
+Stack: Next.js + Supabase (supabase.rpc()) · Naming: clinica_rpt_[entidad]
+Decisiones ya tomadas:
+
+Facturación + Inventario únicamente
+Tabla con totales al pie (sin gráficos)
+El usuario elige fechas siempre — sin default
+Export PDF (jsPDF + html2canvas, ya implementado en el proyecto) y CSV
+Logo de clínica en header de todos los reportes
+Control por rol: admin / recepcionista / gerente ven todo; dentista ve solo sus propios cobros
+Reporte por sucursal: guard de plan pro / enterprise
+
+
+Secuencia de Ejecución
+PASO 1 — SQL en Supabase (~30 min)
+Ejecutar las 5 funciones en Supabase SQL Editor:
+FunciónReportesclinica_rpt_facturado_por_doctorPor doctor, con filtro de rolclinica_rpt_facturado_por_sucursalMulti-clínica Pro/Enterpriseclinica_rpt_facturado_por_tratamientoPor tratamientoclinica_rpt_metodos_pagoPor método de pago + %clinica_rpt_consumo_inventarioConsumo por período
+La vista v_alertas_inventario ya existe en el schema — la usamos directo.
+PASO 2 — Layout y navegación (~20 min)
+/app/reportes/layout.tsx — sidebar de reportes + header con logo de clínica
+PASO 3 — Páginas por reporte (~2h)
+Una página por reporte, todas con el mismo patrón:
+
+Filtros arriba (fechas, sucursal si aplica)
+Tabla con totales al pie
+Botones PDF y CSV
+
+PASO 4 — Componente compartido de export (~30 min)
+ReporteExport reutilizable: logo + tabla → PDF / CSV, para no repetir código en cada página.
+
+¿Arrancamos con el PASO 1 — el SQL completo listo para pegar en Supabase?estoy utilizando claude code conectado a supabase dame las instrucciones asi : "En Claude Code escribe:
+The "+ Nuevo Paciente" button exists in the patient list. Now make it work completely:
+1. Clicking the button opens a full registration form page at /pacientes/nuevo
+2. The form has 4 sections as defined in CLAUDE.md:
+   - Datos Personales: primer_nombre*, segundo_nombre, primer_apellido*, segundo_apellido, fecha_nacimiento, dpi (13 digits validation), genero
+   - Contacto: telefono*, telefono_alt, email, direccion, como_nos_conocio (dropdown with options from schema)
+   - Seguro Médico: tiene_seguro toggle, if true show seguro_nombre*, seguro_poliza, seguro_vigencia
+   - Información Médica: alergias (tag chips input), condiciones (tag chips input), medicamentos (tag chips input), notas_medicas (textarea)
+3. On submit: save to pacientes table with empresa_id from NEXT_PUBLIC_EMPRESA_ID
+4. On success: redirect to /pacientes with success message
+5. On cancel: return to /pacientes
+6. All validation messages in Spanish guatemalteco
+7. Use Clinical Trust design system from CLAUDE.md"Mostrar más8:26 a. m.Perfecto, ese formato es exactamente lo que Claude Code necesita — instrucciones en inglés, detalladas y referenciando el CLAUDE.md. Aquí los prompts para cada paso de hoy:
+
+PASO 1 — Funciones SQL de Reportes
+In Supabase SQL Editor (or via Claude Code if connected to Supabase), execute these 5 reporting functions following the clinica_[accion]_[entidad] naming convention from CLAUDE.md:
+
+1. clinica_rpt_facturado_por_doctor — returns billing grouped by doctor with role-based filtering:
+   - Parameters: p_empresa_id UUID, p_fecha_inicio DATE, p_fecha_fin DATE, p_sucursal_id UUID DEFAULT NULL, p_dentista_id UUID DEFAULT NULL
+   - Returns: doctor_nombre, sucursal_nombre, total_cobros, subtotal, iva_monto, total_facturado, promedio_por_cita
+   - Filter cobros WHERE estado = 'pagado', join citas → usuarios (dentista) → sucursales
+   - p_sucursal_id NULL means all branches; p_dentista_id NULL means all doctors
+   - Order by total_facturado DESC
+   - Use SECURITY DEFINER
+
+2. clinica_rpt_facturado_por_sucursal — returns billing grouped by branch:
+   - Parameters: p_empresa_id UUID, p_fecha_inicio DATE, p_fecha_fin DATE
+   - Returns: sucursal_nombre, total_cobros, subtotal, iva_total, total_facturado, efectivo, tarjeta, transferencia
+   - Split by metodo_pago using CASE WHEN
+   - Use SECURITY DEFINER
+
+3. clinica_rpt_facturado_por_tratamiento — returns billing grouped by treatment description:
+   - Parameters: p_empresa_id UUID, p_fecha_inicio DATE, p_fecha_fin DATE, p_sucursal_id UUID DEFAULT NULL
+   - Returns: tratamiento, cantidad_items, total_facturado, promedio_precio
+   - Join cobro_items → cobros, group by cobro_items.descripcion
+   - Use SECURITY DEFINER
+
+4. clinica_rpt_metodos_pago — returns billing grouped by payment method with percentage:
+   - Parameters: p_empresa_id UUID, p_fecha_inicio DATE, p_fecha_fin DATE, p_sucursal_id UUID DEFAULT NULL
+   - Returns: metodo_pago, total_cobros, total_facturado, porcentaje
+   - Calculate porcentaje as (SUM(total) / gran_total) * 100, rounded to 1 decimal
+   - Use SECURITY DEFINER
+
+5. clinica_rpt_consumo_inventario — returns inventory consumption for a period:
+   - Parameters: p_empresa_id UUID, p_fecha_inicio DATE, p_fecha_fin DATE, p_sucursal_id UUID DEFAULT NULL
+   - Returns: item_nombre, categoria, sucursal_nombre, total_consumido, unidad_medida, stock_actual, stock_minimo, estado_stock
+   - Filter inventario_movimientos WHERE tipo IN ('salida','consumo')
+   - estado_stock: 'Agotado' if stock_actual = 0, 'Crítico' if stock_actual <= stock_minimo, else 'OK'
+   - Use SECURITY DEFINER
+
+Note: v_alertas_inventario view already exists in the schema — do not recreate it.
+
+PASO 2 — Layout del Módulo de Reportes
+Create the reports module layout and navigation at /app/reportes/layout.tsx following the Clinical Trust design system from CLAUDE.md:
+
+1. Create /app/reportes/layout.tsx with:
+   - Left sidebar navigation with two sections:
+     - "Facturación": links to /reportes/facturacion/por-doctor, /reportes/facturacion/por-sucursal, /reportes/facturacion/por-tratamiento, /reportes/facturacion/metodos-pago
+     - "Inventario": links to /reportes/inventario/alertas, /reportes/inventario/consumo
+   - Hide /reportes/facturacion/por-sucursal link if empresa.plan === 'estandar'
+   - Active link highlighted using Clinical Trust colors
+
+2. Create /app/reportes/page.tsx — redirect to /reportes/facturacion/por-doctor
+
+3. Create a shared ReporteHeader component at /components/reportes/ReporteHeader.tsx:
+   - Displays empresa.logo_url as img (fallback to empresa.nombre if no logo)
+   - Displays empresa.nombre_comercial below logo
+   - Displays report title passed as prop
+   - Displays generated date: "Generado el [fecha actual]"
+   - Use Clinical Trust design system
+
+4. Create a shared ReporteExport component at /components/reportes/ReporteExport.tsx:
+   - Props: tableRef (React ref), filename (string), columns (string[]), rows (object[])
+   - PDF button: uses jsPDF + html2canvas (already installed in project) to capture the report div — include ReporteHeader in the capture
+   - CSV button: generates CSV from columns and rows arrays, triggers download with filename.csv
+   - Button labels: "Exportar PDF" and "Exportar CSV"
+   - Use Clinical Trust design system for buttons
+
+PASO 3 — Página: Facturado por Doctor
+Create the billing-by-doctor report page at /app/reportes/facturacion/por-doctor/page.tsx using the Clinical Trust design system from CLAUDE.md:
+
+1. Filters bar at the top:
+   - Date range: "Fecha inicio" and "Fecha fin" date inputs (no default value — user always selects)
+   - Branch selector: dropdown populated from sucursales table filtered by empresa_id. Label "Sucursal", first option "Todas las sucursales" (sends null)
+   - "Generar Reporte" button — disabled until both dates are selected
+
+2. Role-based doctor filter:
+   - If current user rol === 'dentista': automatically pass their usuario_id as p_dentista_id — they can only see their own data, do not show doctor selector
+   - If rol is 'admin', 'recepcionista', or 'gerente': show doctor selector dropdown with "Todos los doctores" as first option
+
+3. On submit: call supabase.rpc('clinica_rpt_facturado_por_doctor', { p_empresa_id, p_fecha_inicio, p_fecha_fin, p_sucursal_id, p_dentista_id })
+
+4. Results table with columns: Doctor, Sucursal, Cobros, Subtotal, IVA, Total Facturado, Promedio/Cita
+   - All monetary values formatted as Q #,##0.00
+   - Totals row at the bottom summing: Cobros, Subtotal, IVA, Total Facturado
+
+5. Above table: ReporteHeader component with title "Facturación por Doctor"
+6. Below filters, above table: ReporteExport component
+
+7. Empty state if no results: "No hay cobros registrados para el período seleccionado"
+8. Loading state while fetching
+9. All labels and messages in Spanish guatemalteco
+
+PASO 4 — Páginas Restantes de Facturación
+Create the remaining 3 billing report pages following the exact same pattern as /app/reportes/facturacion/por-doctor/page.tsx (same filter bar structure, same table-with-totals layout, same ReporteHeader and ReporteExport components, same Spanish guatemalteco labels):
+
+1. /app/reportes/facturacion/por-sucursal/page.tsx:
+   - Guard: if empresa.plan === 'estandar' show message "Esta función está disponible en el plan Pro o Enterprise" and do not render the report
+   - Filters: date range only (no branch selector — shows all branches)
+   - RPC: clinica_rpt_facturado_por_sucursal
+   - Table columns: Sucursal, Cobros, Subtotal, IVA, Total, Efectivo, Tarjeta, Transferencia
+   - Totals row for all numeric columns
+   - Title: "Facturación por Sucursal"
+
+2. /app/reportes/facturacion/por-tratamiento/page.tsx:
+   - Filters: date range + branch selector
+   - RPC: clinica_rpt_facturado_por_tratamiento
+   - Table columns: Tratamiento, Cantidad, Total Facturado, Precio Promedio
+   - Totals row for Cantidad and Total Facturado
+   - Title: "Facturación por Tratamiento"
+
+3. /app/reportes/facturacion/metodos-pago/page.tsx:
+   - Filters: date range + branch selector
+   - RPC: clinica_rpt_metodos_pago
+   - Table columns: Método de Pago, Cobros, Total, Porcentaje
+   - Porcentaje shown as "45.2%"
+   - Totals row for Cobros and Total columns
+   - Title: "Métodos de Pago"
+
+PASO 5 — Páginas de Inventario
+Create the 2 inventory report pages following the same pattern (ReporteHeader, ReporteExport, filters, table with totals, Spanish guatemalteco):
+
+1. /app/reportes/inventario/alertas/page.tsx:
+   - No date filter — this is a current snapshot
+   - Branch selector only (all branches option included)
+   - Data source: query v_alertas_inventario view directly via supabase.from('v_alertas_inventario').select('*') filtered by empresa_id and sucursal_id
+   - Table columns: Artículo, Categoría, Stock Actual, Stock Mínimo, % Stock, Estado
+   - Estado column: colored badge — red for "agotado", orange for "critico"
+   - No totals row — this is a status list
+   - Title: "Alertas de Inventario"
+   - "Generar Reporte" button not needed — loads automatically on page load and on branch change
+
+2. /app/reportes/inventario/consumo/page.tsx:
+   - Filters: date range + branch selector
+   - RPC: clinica_rpt_consumo_inventario
+   - Table columns: Artículo, Categoría, Sucursal, Consumido, Unidad, Stock Actual, Stock Mínimo, Estado
+   - Estado column: same colored badge as alertas page (agotado = red, crítico = orange, OK = green)
+   - Totals row: sum of Consumido column only
+   - Title: "Consumo de Inventario"
+
+Ejecutá en ese orden. Cada paso es independiente — si Claude Code falla en alguna función SQL, podés corregir antes de avanzar al siguiente. ¿Arrancamos?que pasos dejamos ayer para hacer hoy?8:29 a. m.Relevant chatsRelevant chatsSegún la sesión anterior, los pendientes documentados para hoy eran:
+
+Tax configuration — Agregar campos IVA % e ISR % en la configuración de empresa para declaraciones mensuales
+File attachments en expediente clínico — Radiografías y PDFs diagnósticos usando la tabla expediente_imagenes que ya existe en el schema
+Módulo Médicos — Sección dedicada en el sidebar
+Subscription-based limits — Caps de sucursales y usuarios por rol según plan
+RBAC — Lock de menús y elementos UI por rol
+Módulo básico de contabilidad — Resúmenes de ventas e impuestos
+Logo de clínica — Upload
+Email notifications — Via Brevo (free tier, ~300 emails/día)
+WhatsApp notifications — CallMeBot para piloto → Meta Cloud API para producción
+
+
+Sin embargo, en esta sesión de hoy ya definimos el módulo de reportes (facturación + inventario) con todos sus parámetros — y no estaba en la lista original.
+¿Cómo querés priorizar? ¿Seguimos con reportes que ya tenemos planificado al detalle, o atendés primero alguno de los pendientes de la lista anterior?atendamos primero la lista de ayer8:30 a. m.Bien. Repasemos la lista y definamos qué hacemos con cada punto hoy, porque algunos son más rápidos que otros y otros son decisiones de arquitectura primero.
+Ordenados por complejidad/dependencia:
+
+Rápidos — se pueden hacer hoy completos:
+
+Logo de clínica — upload a Supabase Storage + mostrar en UI. 30-45 min.
+Tax configuration — 2 campos nuevos en config de empresa (IVA %, ISR %). 20 min.
+Módulo Médicos — sección en sidebar + página básica. 30 min.
+
+Medios — requieren algo de diseño antes de codificar:
+
+File attachments expediente — upload radiografías/PDFs, tabla expediente_imagenes ya existe. 1-2h.
+Módulo contabilidad básico — resumen ventas + impuestos. Depende de si tiene queries definidas.
+
+Complejos — probablemente para próxima sesión:
+
+Subscription limits — caps por plan en branches/usuarios.
+RBAC — lock de menús por rol. Requiere definir la matriz de permisos primero.
+Email Brevo — integración API externa.
+WhatsApp CallMeBot — integración API externa.
+
+
+Mi recomendación: hoy atacamos los 3 rápidos + file attachments. Con eso cerramos 4 pendientes de la lista.
+¿Te parece ese orden, o querés priorizar diferente?empecemos8:31 a. m.Arrancamos con los 3 rápidos primero, en orden. Copiá y pegá cada prompt en Claude Code:
+
+1️⃣ Tax Configuration — Campos IVA % e ISR %
+In the empresa/clinic configuration page, add tax fields following the Clinical Trust design system from CLAUDE.md:
+
+1. Add two new columns to the empresas table via Supabase migration:
+   - tasa_iva_declaracion NUMERIC(5,2) DEFAULT 5.00 (percentage for monthly IVA declaration, e.g. 5 for 5%)
+   - tasa_isr NUMERIC(5,2) DEFAULT 5.00 (percentage for monthly ISR declaration)
+
+2. In the configuration page (wherever empresa/clinic data is edited), add a new section "Configuración Fiscal" with:
+   - "Tasa IVA (%)" numeric input, value from tasa_iva_declaracion, hint text: "Para declaración mensual de IVA"
+   - "Tasa ISR (%)" numeric input, value from tasa_isr, hint text: "Para declaración mensual de ISR"
+   - Both fields accept decimals (e.g. 5.00, 12.00)
+   - Include these fields in the existing save/update flow for empresa configuration
+   - Validation: both must be between 0 and 100, error messages in Spanish guatemalteco
+
+3. All labels in Spanish guatemalteco
+4. Use Clinical Trust design system from CLAUDE.md
+
+2️⃣ Logo de Clínica — Upload
+Add clinic logo upload functionality following the Clinical Trust design system from CLAUDE.md:
+
+1. In Supabase Storage: create a bucket called "logos-clinicas" with public access. Files stored as {empresa_id}/logo.{ext}
+
+2. In the empresa configuration page, add a "Logo de la Clínica" section:
+   - Show current logo if empresas.logo_url is set (img tag, max 200px wide)
+   - If no logo: show placeholder with clinic initials
+   - Upload button "Cambiar Logo" — accepts jpg, png, webp, max 2MB
+   - On upload: upload file to Supabase Storage bucket "logos-clinicas", then update empresas.logo_url with the public URL
+   - Show upload progress
+   - On success: refresh logo preview immediately
+   - Error messages in Spanish guatemalteco (file too large, invalid format, etc.)
+
+3. Use the logo_url already in the empresas table — no schema changes needed
+4. Use Clinical Trust design system from CLAUDE.md
+
+3️⃣ Módulo Médicos — Sidebar + Página
+Create a Médicos module following the Clinical Trust design system from CLAUDE.md:
+
+1. Add "Médicos" link to the sidebar navigation, with a stethoscope or doctor icon, pointing to /medicos
+
+2. Create /app/medicos/page.tsx — list of doctors (usuarios WHERE rol = 'dentista') for the current empresa_id:
+   - Table with columns: Nombre completo, Email, Sucursal asignada, Estado (Activo/Inactivo)
+   - "Activo" shown as green badge, "Inactivo" as gray badge
+   - "+ Nuevo Médico" button in top right
+   - Search input to filter by name
+   - Empty state: "No hay médicos registrados"
+
+3. Create /app/medicos/nuevo/page.tsx — new doctor form:
+   - Fields: nombre*, apellido*, email*, rol (locked to 'dentista'), sucursal_id (dropdown from sucursales), activo toggle
+   - On submit: insert into usuarios table with empresa_id from NEXT_PUBLIC_EMPRESA_ID and rol = 'dentista'
+   - On success: redirect to /medicos with success message
+   - On cancel: return to /medicos
+
+4. Create /app/medicos/[id]/page.tsx — doctor profile (read mode):
+   - Shows all doctor data
+   - "Editar" button that enables edit mode inline
+   - Edit mode: same fields as nuevo form, on save updates the record
+   - "Desactivar" / "Activar" toggle button
+
+5. All labels and messages in Spanish guatemalteco
+6. Use Clinical Trust design system from CLAUDE.md
+
+Ejecutá estos 3 en orden. Cuando termines los 3 arrancamos con file attachments en expediente que es el más complejo del día. ¿Listo?siguiente8:54 a. m.4️⃣ File Attachments en Expediente Clínico
+Add file attachment support (X-rays and diagnostic PDFs) to the clinical records 
+module using the existing expediente_imagenes table from the schema. Follow the 
+Clinical Trust design system from CLAUDE.md:
+
+1. Supabase Storage bucket:
+   - Create bucket "expediente-imagenes" with private access (not public)
+   - Files stored as: {empresa_id}/{paciente_id}/{cita_id}/{timestamp}-{filename}
+
+2. In the expediente/evolution note view for each cita, add an "Archivos" section 
+   below the existing note content:
+   - List existing attachments from expediente_imagenes filtered by cita_id
+   - Each attachment shows: icon (PDF or image), titulo, tipo label, fecha upload, 
+     download button
+   - "Agregar Archivo" button opens upload panel
+
+3. Upload panel:
+   - File input: accepts jpg, png, webp, pdf only. Max 10MB per file.
+   - Fields after selecting file:
+     - "Título" text input (required)
+     - "Tipo" dropdown with options from schema check constraint:
+       Radiografía Periapical, Radiografía Panorámica, Radiografía Bitewing, 
+       Foto Intraoral, Foto Extraoral, Foto RX, Documento, Otro
+     - "Descripción" textarea (optional)
+   - On upload: 
+     a. Upload file to Supabase Storage bucket "expediente-imagenes"
+     b. Insert row into expediente_imagenes with: empresa_id, paciente_id, 
+        cita_id, nota_id (if nota exists), tipo, titulo, descripcion, 
+        storage_path, url_publica (signed URL), tamano_bytes, formato, creado_por
+   - Show upload progress bar
+   - On success: refresh attachments list immediately
+
+4. Viewing attachments:
+   - Images (jpg, png, webp): open in a lightbox/modal preview
+   - PDFs: open in new browser tab via signed URL
+   - Signed URLs generated on-demand with 1 hour expiry using 
+     supabase.storage.from('expediente-imagenes').createSignedUrl()
+   - Do NOT store permanent public URLs for private files — always use signed URLs
+
+5. Delete attachment:
+   - Trash icon on each attachment (visible only to admin or the user who uploaded)
+   - Confirmation dialog: "¿Eliminar este archivo? Esta acción no se puede deshacer."
+   - On confirm: delete from Supabase Storage AND delete row from expediente_imagenes
+
+6. In the expediente index page (/expedientes or patient profile), show attachment 
+   count badge per cita: e.g. "3 archivos"
+
+7. All labels and messages in Spanish guatemalteco
+8. Use Clinical Trust design system from CLAUDE.md
+
+Cuando termine este, arrancamos con el módulo de contabilidad básico. ¿Cómo va Claude Code con los anteriores?listo, modulo contabilidad basico10:03 a. m.5️⃣ Módulo Contabilidad Básica
+Antes del prompt, una decisión rápida de diseño:Definime estas dos cosas rápido y te doy el prompt listo:
+¿Qué incluye contabilidad básica? (podés marcar varias)
+
+Resumen de ventas del mes (total facturado, IVA cobrado, subtotal)
+Proyección de impuestos a pagar (IVA e ISR calculados con las tasas que configuramos hoy)
+Desglose por método de pago
+Comparativo mes anterior
+
+¿Estructura de la página?
+
+Una sola página con todo
+Página resumen + detalle de transacciones
+Solo resumen, sin detalle
+P: ¿Qué incluye el módulo de contabilidad básica? (Seleccione todas las que correspondan)
+R: Resumen de ventas del mes (total facturado, IVA cobrado, subtotal), Proyección de impuestos a pagar (IVA e ISR calculados), Desglose por método de pago, Comparativo mes anteriorP: ¿Estructura de la página?
+R: Una sola página con todo10:05 a. m.Perfecto. Aquí el prompt:
+
+5️⃣ Módulo Contabilidad Básica
+Create a basic accounting module at /app/contabilidad/page.tsx following the 
+Clinical Trust design system from CLAUDE.md:
+
+1. Add "Contabilidad" link to the sidebar navigation with an accounting/calculator 
+   icon, pointing to /contabilidad
+
+2. Create a SQL function clinica_rpt_contabilidad_mensual in Supabase:
+   - Parameters: p_empresa_id UUID, p_mes INTEGER, p_anio INTEGER, 
+     p_sucursal_id UUID DEFAULT NULL
+   - Returns single row with:
+     total_cobros BIGINT
+     subtotal NUMERIC          -- sum of cobros.subtotal
+     iva_cobrado NUMERIC       -- sum of cobros.iva_monto
+     total_facturado NUMERIC   -- sum of cobros.total
+     iva_a_pagar NUMERIC       -- total_facturado * (tasa_iva_declaracion/100) from empresas
+     isr_a_pagar NUMERIC       -- total_facturado * (tasa_isr/100) from empresas
+     efectivo NUMERIC
+     tarjeta NUMERIC
+     transferencia NUMERIC
+     cuotas NUMERIC
+     -- Previous month comparison:
+     total_mes_anterior NUMERIC
+     variacion_porcentual NUMERIC  -- ((total_facturado - total_mes_anterior) / 
+                                   --   NULLIF(total_mes_anterior,0)) * 100
+   - Filter cobros WHERE estado = 'pagado' AND EXTRACT(MONTH FROM fecha_cobro) = p_mes 
+     AND EXTRACT(YEAR FROM fecha_cobro) = p_anio
+   - Use SECURITY DEFINER
+
+3. Page layout — single page with everything, month/year selector at top:
+   - Month selector: dropdown (Enero–Diciembre) + year input, default to current month/year
+   - Branch selector: "Todas las sucursales" + individual branches (plan Pro/Enterprise only)
+   - "Generar" button
+
+4. Section 1 — Resumen de Ventas: 4 KPI cards in a row:
+   - "Total Facturado" → total_facturado formatted as Q #,##0.00
+   - "Subtotal (sin IVA)" → subtotal
+   - "IVA Cobrado" → iva_cobrado
+   - "Total Cobros" → total_cobros (count, no currency format)
+
+5. Section 2 — Proyección de Impuestos a Pagar: 2 cards side by side:
+   - "IVA Estimado a Pagar" → iva_a_pagar (Q #,##0.00), 
+     subtitle: "Tasa: {tasa_iva_declaracion}%"
+   - "ISR Estimado a Pagar" → isr_a_pagar (Q #,##0.00), 
+     subtitle: "Tasa: {tasa_isr}%"
+   - Disclaimer text below: "* Valores estimados. Consulte a su contador para 
+     la declaración oficial."
+
+6. Section 3 — Desglose por Método de Pago: simple table with columns:
+   Método, Total, Porcentaje
+   Rows: Efectivo, Tarjeta, Transferencia, Cuotas
+   Totals row at bottom
+
+7. Section 4 — Comparativo Mes Anterior: single card showing:
+   - "Mes anterior": total_mes_anterior formatted as Q #,##0.00
+   - "Mes actual": total_facturado
+   - Variación: variacion_porcentual shown as "+12.5%" in green if positive, 
+     "-8.3%" in red if negative, "0%" in gray
+   - Arrow icon up/down matching the direction
+
+8. Export: PDF and CSV buttons using the same ReporteExport component built 
+   in the reportes module today. PDF includes all 4 sections with clinic logo.
+
+9. All labels and messages in Spanish guatemalteco
+10. Use Clinical Trust design system from CLAUDE.md
+
+Con esto cerrás los 5 pendientes del día. Quedan para la próxima sesión: Subscription limits, RBAC, Email Brevo y WhatsApp CallMeBot — que son los más complejos y conviene atacarlos juntos en una sesión dedicada. ¿Cómo va todo hasta ahora?esto al cargar contabilidad11:38 a. m.Error de JSX clásico — un </div> tiene un comentario pegado que lo rompe. En la línea 618 hay </div> {/* fin reporteRef */} y el parser lo interpreta mal. Dale este prompt a Claude Code:
+
+Fix build error in /app/contabilidad/page.tsx at line 618:
+
+The JSX comment is incorrectly placed inline with the closing tag:
+</div> {/* fin reporteRef */}
+
+Move the comment to its own line, separated from the closing tag:
+</div>
+{/* fin reporteRef */}
+
+Check the entire file for any other closing tags that have inline JSX comments 
+attached and apply the same fix. Then verify the file compiles without errors.
+
+Ese patrón </div> {/* comentario */} en la misma línea a veces confunde al parser de Turbopack. La corrección es trivial, solo separar en dos líneas.continua11:41 a. m.El comentario se movió a línea 619 pero el error persiste — el problema real es que {/* fin reporteRef */} está dentro del JSX en una posición inválida, fuera de cualquier elemento padre. Hay un </div> de más o de menos en ese bloque. Dale esto a Claude Code:
+
+Fix build error in /app/contabilidad/page.tsx. The file has a JSX structure 
+problem around line 618-619. The comment {/* fin reporteRef */} is appearing 
+outside of a valid JSX parent element, which means there is a mismatched 
+opening/closing div tag somewhere in the file.
+
+Do the following:
+1. Read the entire file /app/contabilidad/page.tsx
+2. Find and fix all mismatched or unclosed JSX tags — count every opening <div> 
+   and make sure it has a matching </div>
+3. Remove ALL inline JSX comments like {/* ... */} that appear between sibling 
+   elements at the root level of the return statement — they cause parser issues 
+   with Turbopack
+4. Ensure the return statement has exactly one root element wrapping everything
+5. Do not change any logic, state, or UI — only fix the JSX structure
+6. Verify the fix compiles without errors
+
+El issue es estructural — Claude Code generó un div mal cerrado en un archivo largo. Este prompt lo fuerza a leer el archivo completo y contar los tags.esto11:43 a. m.El build ya compila — este es un error de runtime. El RPC clinica_rpt_contabilidad_mensual está retornando {} vacío, lo que significa que la función SQL no existe todavía en Supabase o retornó error. Dale esto a Claude Code:
+
+Fix the runtime error in /app/contabilidad/page.tsx — the RPC call to 
+clinica_rpt_contabilidad_mensual is returning an empty object {}.
+
+1. First, check if the function exists in Supabase by adding error logging:
+   const { data, error } = await supabase.rpc('clinica_rpt_contabilidad_mensual', {...})
+   if (error) console.error('Supabase RPC error:', error)
+   Log the full error object so we can see what Supabase returns.
+
+2. Create the SQL function clinica_rpt_contabilidad_mensual in Supabase 
+   if it does not exist. Execute this SQL via supabase.rpc or show it 
+   for manual execution in Supabase SQL Editor:
+
+CREATE OR REPLACE FUNCTION clinica_rpt_contabilidad_mensual(
+  p_empresa_id   UUID,
+  p_mes          INTEGER,
+  p_anio         INTEGER,
+  p_sucursal_id  UUID DEFAULT NULL
+)
+RETURNS TABLE (
+  total_cobros          BIGINT,
+  subtotal              NUMERIC,
+  iva_cobrado           NUMERIC,
+  total_facturado       NUMERIC,
+  iva_a_pagar           NUMERIC,
+  isr_a_pagar           NUMERIC,
+  efectivo              NUMERIC,
+  tarjeta               NUMERIC,
+  transferencia         NUMERIC,
+  cuotas                NUMERIC,
+  total_mes_anterior    NUMERIC,
+  variacion_porcentual  NUMERIC
+) AS $$
+DECLARE
+  v_tasa_iva NUMERIC;
+  v_tasa_isr NUMERIC;
+  v_mes_ant  INTEGER;
+  v_anio_ant INTEGER;
+BEGIN
+  -- Tasas fiscales de la empresa
+  SELECT tasa_iva_declaracion, tasa_isr
+  INTO v_tasa_iva, v_tasa_isr
+  FROM empresas WHERE id = p_empresa_id;
+
+  v_tasa_iva := COALESCE(v_tasa_iva, 5);
+  v_tasa_isr := COALESCE(v_tasa_isr, 5);
+
+  -- Mes anterior
+  v_mes_ant  := CASE WHEN p_mes = 1 THEN 12 ELSE p_mes - 1 END;
+  v_anio_ant := CASE WHEN p_mes = 1 THEN p_anio - 1 ELSE p_anio END;
+
+  RETURN QUERY
+  SELECT
+    COUNT(c.id),
+    COALESCE(SUM(c.subtotal), 0),
+    COALESCE(SUM(c.iva_monto), 0),
+    COALESCE(SUM(c.total), 0),
+    ROUND(COALESCE(SUM(c.total), 0) * (v_tasa_iva / 100), 2),
+    ROUND(COALESCE(SUM(c.total), 0) * (v_tasa_isr / 100), 2),
+    COALESCE(SUM(CASE WHEN c.metodo_pago = 'efectivo'      THEN c.total ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN c.metodo_pago LIKE 'tarjeta%'   THEN c.total ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN c.metodo_pago = 'transferencia' THEN c.total ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN c.metodo_pago = 'cuota'         THEN c.total ELSE 0 END), 0),
+    -- Mes anterior
+    COALESCE((
+      SELECT SUM(c2.total) FROM cobros c2
+      WHERE c2.empresa_id = p_empresa_id
+        AND c2.estado = 'pagado'
+        AND EXTRACT(MONTH FROM c2.fecha_cobro) = v_mes_ant
+        AND EXTRACT(YEAR  FROM c2.fecha_cobro) = v_anio_ant
+        AND (p_sucursal_id IS NULL OR c2.sucursal_id = p_sucursal_id)
+    ), 0),
+    -- Variación porcentual
+    ROUND((
+      COALESCE(SUM(c.total), 0) - COALESCE((
+        SELECT SUM(c2.total) FROM cobros c2
+        WHERE c2.empresa_id = p_empresa_id
+          AND c2.estado = 'pagado'
+          AND EXTRACT(MONTH FROM c2.fecha_cobro) = v_mes_ant
+          AND EXTRACT(YEAR  FROM c2.fecha_cobro) = v_anio_ant
+          AND (p_sucursal_id IS NULL OR c2.sucursal_id = p_sucursal_id)
+      ), 0)
+    ) / NULLIF(COALESCE((
+        SELECT SUM(c2.total) FROM cobros c2
+        WHERE c2.empresa_id = p_empresa_id
+          AND c2.estado = 'pagado'
+          AND EXTRACT(MONTH FROM c2.fecha_cobro) = v_mes_ant
+          AND EXTRACT(YEAR  FROM c2.fecha_cobro) = v_anio_ant
+          AND (p_sucursal_id IS NULL OR c2.sucursal_id = p_sucursal_id)
+      ), 0), 0) * 100, 1)
+  FROM cobros c
+  WHERE c.empresa_id = p_empresa_id
+    AND c.estado = 'pagado'
+    AND EXTRACT(MONTH FROM c.fecha_cobro) = p_mes
+    AND EXTRACT(YEAR  FROM c.fecha_cobro) = p_anio
+    AND (p_sucursal_id IS NULL OR c.sucursal_id = p_sucursal_id);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+3. After creating the function, test it in Supabase SQL Editor with:
+   SELECT * FROM clinica_rpt_contabilidad_mensual(
+     '[tu empresa_id]'::UUID, 3, 2026, NULL
+   );
+
+4. Once confirmed working, remove the extra console.error logging added in step 1
+   and handle the case where data is null or empty gracefully in the UI.
+
+Lo más probable es que la función no se haya creado en Supabase todavía — el prompt del módulo de contabilidad la definía pero Claude Code no la ejecutó directamente. Ejecutá el SQL manualmente en Supabase SQL Editor si es más rápido.este es el reporte generado de contabilidad, le falta el encabezado incluyendo el logo y validar que si la suscripcion en basica (sin sucursales) no debe habilitar la opcion de sucursal, debe tener por defecto la clinica que esta en plan de suscripcion, por lo demas esta bien por ahora1:03 p. m.Dos correcciones puntuales. Dale este prompt a Claude Code:
+
+Fix two issues in /app/contabilidad/page.tsx and its PDF export:
+
+1. REPORT HEADER — Add clinic header to the report (both on screen and in PDF export):
+   - At the top of the report results section (above "Marzo 2026 · Clínica Principal"), 
+     add the ReporteHeader component already built at /components/reportes/ReporteHeader.tsx
+   - Pass props: title="Reporte de Contabilidad", show empresa.logo_url as logo
+   - If ReporteHeader does not exist yet, create it inline with:
+     - Clinic logo (empresas.logo_url) left-aligned, max height 60px
+     - Fallback to empresa.nombre_comercial initials if no logo
+     - Report title centered or below logo
+     - "Generado el [fecha actual dd/MM/yyyy]" in small text
+   - The header must be inside the reporteRef div so it appears in the PDF export
+
+2. BRANCH SELECTOR — Hide it for plan 'estandar':
+   - Fetch empresa.plan from Supabase on page load
+   - If plan === 'estandar': 
+     - Do NOT show the Sucursal dropdown
+     - Automatically use the empresa's primary sucursal (sucursales WHERE es_principal = true 
+       AND empresa_id = p_empresa_id) as p_sucursal_id in the RPC call
+     - No UI change needed — just send the principal sucursal UUID silently
+   - If plan is 'pro' or 'enterprise': show the Sucursal dropdown as it is now 
+     with "Todas las sucursales" as first option
+   - All labels in Spanish guatemalteco
+
+Esto cierra el módulo de contabilidad. ¿Cómo van los otros módulos del día (logo, médicos, file attachments)?la receta tiene codigo de colegiado, pero en la ficha medicos no aparece para llenar, tambien se debe incluir foto de medico, lo demas esta bien (aun falta pruebas)1:08 p. m.Dos campos faltantes en el módulo de médicos. Dale este prompt a Claude Code:
+
+Add two missing fields to the Médicos module following the Clinical Trust 
+design system from CLAUDE.md:
+
+1. DATABASE — Add columns to usuarios table via Supabase migration:
+   - numero_colegiado VARCHAR(20) — professional registration number
+   - foto_url TEXT — doctor profile photo URL
+
+2. FORM /app/medicos/nuevo/page.tsx — Add to "Datos personales" section:
+   - "Número de Colegiado" text input, maps to numero_colegiado, 
+     placeholder "Ej. 12345", not required
+   - "Foto del Médico" — photo upload field:
+     - Shows circular avatar placeholder with doctor initials if no photo
+     - Upload button "Subir Foto" — accepts jpg, png, webp, max 2MB
+     - On upload: store in Supabase Storage bucket "fotos-medicos" 
+       as {empresa_id}/{usuario_id}.{ext}, update foto_url field
+     - Show preview immediately after upload
+   - Include both fields in the save/insert flow
+
+3. PROFILE /app/medicos/[id]/page.tsx — Add to read and edit modes:
+   - Show foto_url as circular avatar (80px) next to doctor name in header
+   - Show "Colegiado No." below doctor name in read mode
+   - In edit mode: same upload control as the new form + colegiado input
+
+4. RECETA PDF — The numero_colegiado is already shown in the prescription PDF 
+   (visible in the "Colegiado:" field). Verify it pulls from 
+   usuarios.numero_colegiado for the logged-in dentist. If it is currently 
+   blank/hardcoded, fix it to read from the database.
+
+5. All labels in Spanish guatemalteco
+6. Use Clinical Trust design system from CLAUDE.md
+
+Esto cierra médicos completo. ¿Cómo van logo de clínica y file attachments en expediente?listo, en todos lados donde aparezca elegir sucursal, debe estar amarrado al plan de suscripcion, si es basico debe tener por default la clinica registrada1:14 p. m.Correcto, esa lógica debe ser global y consistente en toda la app. Dale este prompt a Claude Code:
+
+Implement a global subscription-based branch selector rule throughout the entire 
+application following the Clinical Trust design system from CLAUDE.md:
+
+1. Create a reusable hook at /hooks/useSucursal.ts:
+   - Fetches empresa.plan and sucursales for the current empresa_id on mount
+   - If plan === 'estandar':
+     - Returns single sucursal (WHERE es_principal = true AND empresa_id = p_empresa_id)
+     - isMultiSucursal = false
+     - selectedSucursalId = principal sucursal UUID (auto-selected, not changeable)
+   - If plan === 'pro' or 'enterprise':
+     - Returns all active sucursales for the empresa
+     - isMultiSucursal = true
+     - selectedSucursalId = null by default (means "todas")
+   - Exposes: { sucursales, selectedSucursalId, setSelectedSucursalId, 
+               isMultiSucursal, loading }
+
+2. Create a reusable component at /components/SucursalSelector.tsx:
+   - Uses useSucursal hook
+   - If isMultiSucursal === false: renders nothing (no dropdown shown) — 
+     the sucursal is handled silently in the background
+   - If isMultiSucursal === true: renders dropdown with "Todas las sucursales" 
+     as first option + list of sucursales
+   - Props: onSucursalChange(sucursalId: string | null) callback
+   - Label: "Sucursal" in Spanish guatemalteco
+
+3. Replace ALL existing branch selectors/dropdowns throughout the app with 
+   the new SucursalSelector component. Find every place that has a sucursal 
+   dropdown or selector including:
+   - /app/contabilidad/page.tsx
+   - /app/reportes/** all report pages
+   - /app/medicos/nuevo/page.tsx and /app/medicos/[id]/page.tsx
+   - /app/agenda/page.tsx (if it has branch selector)
+   - /app/cobros/page.tsx (if it has branch selector)
+   - /app/inventario/page.tsx (if it has branch selector)
+   - /app/caja/page.tsx (if it has branch selector)
+   - Any other page that has a sucursal filter or selector
+   
+4. In every page that uses SucursalSelector, pass the returned sucursalId 
+   (from the hook via the callback) to the Supabase query or RPC call as 
+   p_sucursal_id or sucursal_id filter. For plan 'estandar' this will always 
+   be the principal sucursal UUID automatically.
+
+5. Do not show any plan-related message or explanation to the user — 
+   the selector simply does not appear for 'estandar' plan. The experience 
+   is seamless.
+
+6. All labels in Spanish guatemalteco
+7. Use Clinical Trust design system from CLAUDE.md
+
+Con esto la lógica queda centralizada en un hook y un componente — si en el futuro cambia el plan de un cliente, toda la app se adapta automáticamente sin tocar nada más. ¿Cómo van logo y file attachments?logo y file attachments bien, que sigue1:20 p. m.Excelente — cerramos todos los pendientes de ayer. Resumen de lo completado hoy:
+✅ Tax configuration (IVA % e ISR %)
+✅ Logo de clínica
+✅ Módulo Médicos + colegiado + foto
+✅ File attachments en expediente
+✅ Módulo Contabilidad básica
+✅ SucursalSelector global por plan
+
+Lo que sigue son los 4 pendientes complejos que dejamos para sesión dedicada:
+#MóduloComplejidad1RBAC — lock de menús y UI por rolAlta2Subscription limits — caps de sucursales/usuarios por planMedia3Email Brevo — notificaciones de citasAlta4WhatsApp CallMeBot — pilotoMedia
+Y el módulo de reportes completo que definimos hoy pero no implementamos aún.
+
+Mi recomendación para la próxima sesión: atacar RBAC + Subscription limits juntos — son interdependientes y el hook useSucursal que acabamos de crear ya es base para ambos.
+¿Continuamos ahora con RBAC o preferís cerrar la sesión de hoy aquí?continuemos con RBAC + Subscription1:22 p. m.Antes de codificar, necesito que definamos la matriz de permisos. Es la decisión más importante del RBAC.Respondeme estas tres antes de armar la matriz:
+1. ¿Qué roles activos en el piloto?
+admin, dentista, recepcionista, asistente, gerente
+2. ¿Cómo aplicamos restricciones?
+
+Solo bloquear rutas
+Solo ocultar en UI
+Ambos
+
+3. ¿Permisos configurables por clínica o fijos en código?
+Con eso armo la matriz completa y el prompt.P: ¿Qué roles están activos en el piloto? (los del schema son: admin, dentista, asistente, recepcionista, gerente, analista) (Seleccione todas las que correspondan)
+R: admin, dentista, recepcionista, asistenteP: ¿Cómo aplicamos las restricciones de rol?
+R: Ambos — ruta bloqueada Y elementos ocultosP: ¿Los permisos son configurables por clínica o fijos en el sistema?
+R: Sí — admin del SaaS puede configurar permisos por cliente1:23 p. m.Perfecto. Con eso defino la matriz base primero para que la apruebes antes de codificar:
+
+Matriz de Permisos Base
+Módulo / AcciónadmindentistarecepcionistaasistenteDashboard✅✅✅✅Pacientes — ver lista✅✅✅✅Pacientes — crear/editar✅✅✅❌Pacientes — eliminar✅❌❌❌Agenda — ver✅✅✅✅Agenda — crear/editar citas✅✅✅❌Agenda — cancelar citas✅✅✅❌Expediente — ver✅✅❌✅Expediente — crear/editar notas✅✅❌❌Expediente — subir archivos✅✅❌✅Odontograma — ver✅✅❌✅Odontograma — editar✅✅❌❌Cobros — ver✅✅✅❌Cobros — crear✅✅✅❌Cobros — anular✅❌❌❌Caja — ver/cerrar✅❌✅❌Inventario — ver✅✅✅✅Inventario — crear/editar✅❌✅❌Reportes — facturación✅⚠️ solo los suyos✅❌Reportes — inventario✅❌✅❌Contabilidad✅❌❌❌Médicos✅❌❌❌Configuración✅❌❌❌
+
+Subscription limits integrados:
+LímiteEstándarProEnterpriseSucursales1 (fija)hasta 3ilimitadasUsuarios totales515negociadoBotón "+ Nueva Sucursal"ocultovisiblevisibleBotón "+ Nuevo Usuario"bloqueado si ≥5bloqueado si ≥15libre
+
+¿Aprobás esta matriz o hay ajustes antes de generar los prompts? Por ejemplo — ¿recepcionista debe ver contabilidad? ¿asistente puede ver cobros?esta matriz va a ser editable por el admin del tenant?1:26 p. m.Sí, eso es lo que elegiste — "admin del SaaS puede configurar permisos por cliente". Pero hay un matiz importante que definir:
+¿Quién edita los permisos?
+
+Admin del tenant (el dueño de la clínica) — entra a Configuración y ajusta qué puede hacer cada rol en SU clínica
+Admin del SaaS (vos, Strategic Solutions) — entrás al backend y ajustás permisos de cualquier cliente
+
+Son dos cosas distintas. La pregunta es cuál de las dos — o ambas.P: ¿Quién puede editar la matriz de permisos?
+R: Ambos — tenant admin edita los suyos, SaaS admin puede sobrescribirP: ¿Qué tan granular es la edición de permisos?
+R: Ambos niveles1:28 p. m.Bien. Esto ya es un sistema de permisos robusto — implica una tabla en BD, no solo configuración en código. Antes de darte los prompts, el diseño:
+
+Arquitectura RBAC
+Nueva tabla rol_permisos — almacena la matriz por empresa:
+sqlCREATE TABLE rol_permisos (
+  id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  empresa_id   UUID NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
+  rol          VARCHAR(30) NOT NULL,
+  modulo       VARCHAR(50) NOT NULL,  -- 'pacientes', 'agenda', 'cobros', etc.
+  accion       VARCHAR(50) NOT NULL,  -- 'ver', 'crear', 'editar', 'eliminar', 'anular'
+  permitido    BOOLEAN DEFAULT FALSE,
+  sobrescrito_por_saas BOOLEAN DEFAULT FALSE,  -- flag cuando SaaS admin sobrescribe
+  actualizado_en TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (empresa_id, rol, modulo, accion)
+);
+Flujo:
+
+Al crear un tenant nuevo → se insertan los permisos base de la matriz que aprobaste
+Tenant admin edita desde Configuración → actualiza rol_permisos de su empresa
+SaaS admin puede sobrescribir cualquier permiso y marcar sobrescrito_por_saas = true → el tenant admin no puede cambiar esos
+
+Hook central usePermisos() — en cada página/componente consulta si el rol activo tiene permiso para módulo+acción.
+
+¿Aprobás este diseño de tabla antes de generar los prompts?si1:35 p. m.Perfecto. Aquí los prompts en orden:
+
+PASO 1 — Tabla y datos base en Supabase
+Create the RBAC permissions system database structure in Supabase following 
+the clinica_[accion]_[entidad] naming convention from CLAUDE.md:
+
+1. Create the rol_permisos table:
+
+CREATE TABLE rol_permisos (
+  id                    UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  empresa_id            UUID NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
+  rol                   VARCHAR(30) NOT NULL 
+                        CHECK (rol IN ('admin','dentista','recepcionista','asistente')),
+  modulo                VARCHAR(50) NOT NULL,
+  accion                VARCHAR(50) NOT NULL,
+  permitido             BOOLEAN DEFAULT FALSE,
+  sobrescrito_por_saas  BOOLEAN DEFAULT FALSE,
+  actualizado_en        TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (empresa_id, rol, modulo, accion)
+);
+
+ALTER TABLE rol_permisos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "tenant_ve_sus_permisos" ON rol_permisos FOR ALL
+  USING (empresa_id = (
+    SELECT empresa_id FROM usuarios WHERE supabase_uid = auth.uid()
+  ));
+
+CREATE INDEX idx_rol_permisos_lookup 
+  ON rol_permisos(empresa_id, rol, modulo, accion);
+
+2. Create a function to initialize default permissions for a new tenant:
+
+CREATE OR REPLACE FUNCTION clinica_inicializar_permisos(p_empresa_id UUID)
+RETURNS VOID AS $$
+DECLARE
+  permisos JSONB := '[
+    {"rol":"admin","modulo":"dashboard","accion":"ver","permitido":true},
+    {"rol":"admin","modulo":"pacientes","accion":"ver","permitido":true},
+    {"rol":"admin","modulo":"pacientes","accion":"crear","permitido":true},
+    {"rol":"admin","modulo":"pacientes","accion":"editar","permitido":true},
+    {"rol":"admin","modulo":"pacientes","accion":"eliminar","permitido":true},
+    {"rol":"admin","modulo":"agenda","accion":"ver","permitido":true},
+    {"rol":"admin","modulo":"agenda","accion":"crear","permitido":true},
+    {"rol":"admin","modulo":"agenda","accion":"cancelar","permitido":true},
+    {"rol":"admin","modulo":"expediente","accion":"ver","permitido":true},
+    {"rol":"admin","modulo":"expediente","accion":"crear","permitido":true},
+    {"rol":"admin","modulo":"expediente","accion":"subir_archivos","permitido":true},
+    {"rol":"admin","modulo":"odontograma","accion":"ver","permitido":true},
+    {"rol":"admin","modulo":"odontograma","accion":"editar","permitido":true},
+    {"rol":"admin","modulo":"cobros","accion":"ver","permitido":true},
+    {"rol":"admin","modulo":"cobros","accion":"crear","permitido":true},
+    {"rol":"admin","modulo":"cobros","accion":"anular","permitido":true},
+    {"rol":"admin","modulo":"caja","accion":"ver","permitido":true},
+    {"rol":"admin","modulo":"inventario","accion":"ver","permitido":true},
+    {"rol":"admin","modulo":"inventario","accion":"crear","permitido":true},
+    {"rol":"admin","modulo":"reportes","accion":"ver","permitido":true},
+    {"rol":"admin","modulo":"contabilidad","accion":"ver","permitido":true},
+    {"rol":"admin","modulo":"medicos","accion":"ver","permitido":true},
+    {"rol":"admin","modulo":"configuracion","accion":"ver","permitido":true},
+    {"rol":"dentista","modulo":"dashboard","accion":"ver","permitido":true},
+    {"rol":"dentista","modulo":"pacientes","accion":"ver","permitido":true},
+    {"rol":"dentista","modulo":"pacientes","accion":"crear","permitido":true},
+    {"rol":"dentista","modulo":"pacientes","accion":"editar","permitido":true},
+    {"rol":"dentista","modulo":"pacientes","accion":"eliminar","permitido":false},
+    {"rol":"dentista","modulo":"agenda","accion":"ver","permitido":true},
+    {"rol":"dentista","modulo":"agenda","accion":"crear","permitido":true},
+    {"rol":"dentista","modulo":"agenda","accion":"cancelar","permitido":true},
+    {"rol":"dentista","modulo":"expediente","accion":"ver","permitido":true},
+    {"rol":"dentista","modulo":"expediente","accion":"crear","permitido":true},
+    {"rol":"dentista","modulo":"expediente","accion":"subir_archivos","permitido":true},
+    {"rol":"dentista","modulo":"odontograma","accion":"ver","permitido":true},
+    {"rol":"dentista","modulo":"odontograma","accion":"editar","permitido":true},
+    {"rol":"dentista","modulo":"cobros","accion":"ver","permitido":true},
+    {"rol":"dentista","modulo":"cobros","accion":"crear","permitido":true},
+    {"rol":"dentista","modulo":"cobros","accion":"anular","permitido":false},
+    {"rol":"dentista","modulo":"caja","accion":"ver","permitido":false},
+    {"rol":"dentista","modulo":"inventario","accion":"ver","permitido":true},
+    {"rol":"dentista","modulo":"inventario","accion":"crear","permitido":false},
+    {"rol":"dentista","modulo":"reportes","accion":"ver","permitido":true},
+    {"rol":"dentista","modulo":"contabilidad","accion":"ver","permitido":false},
+    {"rol":"dentista","modulo":"medicos","accion":"ver","permitido":false},
+    {"rol":"dentista","modulo":"configuracion","accion":"ver","permitido":false},
+    {"rol":"recepcionista","modulo":"dashboard","accion":"ver","permitido":true},
+    {"rol":"recepcionista","modulo":"pacientes","accion":"ver","permitido":true},
+    {"rol":"recepcionista","modulo":"pacientes","accion":"crear","permitido":true},
+    {"rol":"recepcionista","modulo":"pacientes","accion":"editar","permitido":true},
+    {"rol":"recepcionista","modulo":"pacientes","accion":"eliminar","permitido":false},
+    {"rol":"recepcionista","modulo":"agenda","accion":"ver","permitido":true},
+    {"rol":"recepcionista","modulo":"agenda","accion":"crear","permitido":true},
+    {"rol":"recepcionista","modulo":"agenda","accion":"cancelar","permitido":true},
+    {"rol":"recepcionista","modulo":"expediente","accion":"ver","permitido":false},
+    {"rol":"recepcionista","modulo":"expediente","accion":"crear","permitido":false},
+    {"rol":"recepcionista","modulo":"expediente","accion":"subir_archivos","permitido":false},
+    {"rol":"recepcionista","modulo":"odontograma","accion":"ver","permitido":false},
+    {"rol":"recepcionista","modulo":"odontograma","accion":"editar","permitido":false},
+    {"rol":"recepcionista","modulo":"cobros","accion":"ver","permitido":true},
+    {"rol":"recepcionista","modulo":"cobros","accion":"crear","permitido":true},
+    {"rol":"recepcionista","modulo":"cobros","accion":"anular","permitido":false},
+    {"rol":"recepcionista","modulo":"caja","accion":"ver","permitido":true},
+    {"rol":"recepcionista","modulo":"inventario","accion":"ver","permitido":true},
+    {"rol":"recepcionista","modulo":"inventario","accion":"crear","permitido":true},
+    {"rol":"recepcionista","modulo":"reportes","accion":"ver","permitido":true},
+    {"rol":"recepcionista","modulo":"contabilidad","accion":"ver","permitido":false},
+    {"rol":"recepcionista","modulo":"medicos","accion":"ver","permitido":false},
+    {"rol":"recepcionista","modulo":"configuracion","accion":"ver","permitido":false},
+    {"rol":"asistente","modulo":"dashboard","accion":"ver","permitido":true},
+    {"rol":"asistente","modulo":"pacientes","accion":"ver","permitido":true},
+    {"rol":"asistente","modulo":"pacientes","accion":"crear","permitido":false},
+    {"rol":"asistente","modulo":"pacientes","accion":"editar","permitido":false},
+    {"rol":"asistente","modulo":"pacientes","accion":"eliminar","permitido":false},
+    {"rol":"asistente","modulo":"agenda","accion":"ver","permitido":true},
+    {"rol":"asistente","modulo":"agenda","accion":"crear","permitido":false},
+    {"rol":"asistente","modulo":"agenda","accion":"cancelar","permitido":false},
+    {"rol":"asistente","modulo":"expediente","accion":"ver","permitido":true},
+    {"rol":"asistente","modulo":"expediente","accion":"crear","permitido":false},
+    {"rol":"asistente","modulo":"expediente","accion":"subir_archivos","permitido":true},
+    {"rol":"asistente","modulo":"odontograma","accion":"ver","permitido":true},
+    {"rol":"asistente","modulo":"odontograma","accion":"editar","permitido":false},
+    {"rol":"asistente","modulo":"cobros","accion":"ver","permitido":false},
+    {"rol":"asistente","modulo":"cobros","accion":"crear","permitido":false},
+    {"rol":"asistente","modulo":"cobros","accion":"anular","permitido":false},
+    {"rol":"asistente","modulo":"caja","accion":"ver","permitido":false},
+    {"rol":"asistente","modulo":"inventario","accion":"ver","permitido":true},
+    {"rol":"asistente","modulo":"inventario","accion":"crear","permitido":false},
+    {"rol":"asistente","modulo":"reportes","accion":"ver","permitido":false},
+    {"rol":"asistente","modulo":"contabilidad","accion":"ver","permitido":false},
+    {"rol":"asistente","modulo":"medicos","accion":"ver","permitido":false},
+    {"rol":"asistente","modulo":"configuracion","accion":"ver","permitido":false}
+  ]';
+  p JSONB;
+BEGIN
+  FOR p IN SELECT * FROM jsonb_array_elements(permisos)
+  LOOP
+    INSERT INTO rol_permisos (
+      empresa_id, rol, modulo, accion, permitido
+    ) VALUES (
+      p_empresa_id,
+      (p->>'rol')::VARCHAR,
+      (p->>'modulo')::VARCHAR,
+      (p->>'accion')::VARCHAR,
+      (p->>'permitido')::BOOLEAN
+    )
+    ON CONFLICT (empresa_id, rol, modulo, accion) DO NOTHING;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+3. Run clinica_inicializar_permisos() for the existing dev tenant:
+   SELECT clinica_inicializar_permisos('[empresa_id del tenant de prueba]'::UUID);
+
+PASO 2 — Hook y contexto central
+Create the central RBAC hook and context for ClinicaApp following the 
+Clinical Trust design system from CLAUDE.md:
+
+1. Create /hooks/usePermisos.ts:
+   - On mount: fetch all rol_permisos rows for current empresa_id and 
+     current user's rol from Supabase
+   - Cache the permissions in a Map keyed as "modulo:accion" → boolean
+   - Expose:
+     puedever(modulo: string): boolean
+     puede(modulo: string, accion: string): boolean
+     loading: boolean
+   - Examples:
+     puedever('cobros') → checks modulo='cobros', accion='ver'
+     puede('cobros', 'anular') → checks modulo='cobros', accion='anular'
+
+2. Create /context/PermisosContext.tsx:
+   - Wraps the app with permissions loaded once at login
+   - Provides usePermisosContext() hook so any component can call 
+     puede() and puedever() without re-fetching
+   - Refresh permissions when empresa_id or rol changes
+
+3. Add PermisosContext to the root layout /app/layout.tsx — wrap the 
+   app so permissions are available everywhere
+
+4. Create /components/ProtectedRoute.tsx:
+   - Props: modulo, accion (optional, defaults to 'ver'), children, 
+     fallback (optional)
+   - If puede(modulo, accion) === false: 
+     redirect to /dashboard with toast message 
+     "No tenés permisos para acceder a esta sección"
+   - If loading: show spinner
+   - If permitted: render children
+
+5. Create /components/PermisoGuard.tsx — for hiding UI elements:
+   - Props: modulo, accion, children
+   - If puede(modulo, accion) === false: return null (renders nothing)
+   - If permitted: render children
+   - Usage example: 
+     <PermisoGuard modulo="cobros" accion="anular">
+       <Button>Anular Cobro</Button>
+     </PermisoGuard>
+
+PASO 3 — Aplicar RBAC en toda la app
+Apply RBAC protection throughout the entire ClinicaApp using the 
+ProtectedRoute and PermisoGuard components created in the previous step.
+Follow the Clinical Trust design system from CLAUDE.md:
+
+1. ROUTE PROTECTION — Wrap each page's main content with ProtectedRoute:
+   - /app/pacientes/** → modulo="pacientes" accion="ver"
+   - /app/agenda/** → modulo="agenda" accion="ver"
+   - /app/expediente/** → modulo="expediente" accion="ver"
+   - /app/odontograma/** → modulo="odontograma" accion="ver"
+   - /app/cobros/** → modulo="cobros" accion="ver"
+   - /app/caja/** → modulo="caja" accion="ver"
+   - /app/inventario/** → modulo="inventario" accion="ver"
+   - /app/reportes/** → modulo="reportes" accion="ver"
+   - /app/contabilidad/** → modulo="contabilidad" accion="ver"
+   - /app/medicos/** → modulo="medicos" accion="ver"
+   - /app/configuracion/** → modulo="configuracion" accion="ver"
+
+2. SIDEBAR — Hide menu items the user cannot access:
+   Wrap each sidebar link with PermisoGuard using modulo + accion="ver"
+   so links that the user cannot access simply do not appear in the menu
+
+3. UI ELEMENT GUARDS — Apply PermisoGuard to action buttons:
+   - "Eliminar paciente" button → modulo="pacientes" accion="eliminar"
+   - "Anular cobro" button → modulo="cobros" accion="anular"
+   - "Cancelar cita" button → modulo="agenda" accion="cancelar"
+   - "Nueva nota expediente" button → modulo="expediente" accion="crear"
+   - "Editar odontograma" controls → modulo="odontograma" accion="editar"
+   - "Subir archivo" button in expediente → modulo="expediente" accion="subir_archivos"
+   - "Nuevo item inventario" button → modulo="inventario" accion="crear"
+   - All buttons in /configuracion → modulo="configuracion" accion="ver"
+
+4. REPORTES — Special rule for dentista:
+   In /app/reportes/facturacion/por-doctor/page.tsx the dentista role 
+   CAN access the page but only sees their own data. This is already 
+   handled by the p_dentista_id filter — keep that logic, just ensure 
+   the route is not blocked for dentistas.
+
+PASO 4 — UI de configuración de permisos para tenant admin
+Create the permissions configuration UI for tenant admin at 
+/app/configuracion/permisos/page.tsx following the Clinical Trust 
+design system from CLAUDE.md:
+
+1. Add "Permisos" link inside /app/configuracion section in sidebar,
+   only visible to admin role
+
+2. Page layout:
+   - Title: "Configuración de Permisos"
+   - Role tabs at top: Admin | Dentista | Recepcionista | Asistente
+   - Selecting a tab shows the permissions matrix for that role
+
+3. Permissions matrix display for selected role:
+   - Group permissions by modulo in sections (one section per module)
+   - Module header shows module name in Spanish: 
+     pacientes="Pacientes", agenda="Agenda", expediente="Expediente clínico",
+     odontograma="Odontograma", cobros="Cobros", caja="Caja",
+     inventario="Inventario", reportes="Reportes", 
+     contabilidad="Contabilidad", medicos="Médicos", 
+     configuracion="Configuración"
+   - Under each module: list of acciones as toggle rows
+     Accion labels: ver="Ver", crear="Crear/Registrar", 
+     editar="Editar", eliminar="Eliminar", anular="Anular",
+     cancelar="Cancelar", subir_archivos="Subir archivos"
+   - Each toggle: label on left, toggle switch on right
+   - If sobrescrito_por_saas === true: show lock icon 🔒 next to toggle,
+     disable the toggle (tenant cannot change it), 
+     tooltip: "Permiso bloqueado por el administrador del sistema"
+
+4. Save behavior:
+   - Changes save automatically on toggle (no save button needed)
+   - Call supabase UPDATE on rol_permisos WHERE empresa_id + rol + modulo + accion
+   - Show brief success indicator (checkmark) after each save
+   - On error: revert toggle to previous state + show error toast
+
+5. Admin role (admin) toggles are all locked and cannot be edited —
+   show all as enabled with lock icon. Admin always has full access.
+
+6. All labels in Spanish guatemalteco
+7. Use Clinical Trust design system from CLAUDE.md
+
+PASO 5 — Subscription limits
+Implement subscription-based limits for branches and users in ClinicaApp
+following the Clinical Trust design system from CLAUDE.md:
+
+1. Create /hooks/useLimitesSuscripcion.ts:
+   - Fetches from empresas: plan, max_sucursales, max_usuarios
+   - Fetches current counts: 
+     COUNT of active sucursales for empresa_id
+     COUNT of active usuarios for empresa_id
+   - Exposes:
+     puedeAgregarSucursal(): boolean → current < max_sucursales
+     puedeAgregarUsuario(): boolean → current < max_usuarios
+     sucursalesActuales: number
+     maxSucursales: number
+     usuariosActuales: number
+     maxUsuarios: number
+     plan: string
+
+2. In /app/configuracion/sucursales/page.tsx:
+   - Wrap "+ Nueva Sucursal" button with limit check:
+     If puedeAgregarSucursal() === false:
+       Show button as disabled
+       Show message below: "Alcanzaste el límite de sucursales de tu plan 
+       ({sucursalesActuales}/{maxSucursales}). Actualizá tu plan para agregar más."
+     If plan === 'estandar': hide the button entirely (estandar = 1 sucursal fixed)
+
+3. In /app/configuracion/usuarios/page.tsx:
+   - Wrap "+ Nuevo Usuario" button with limit check:
+     If puedeAgregarUsuario() === false:
+       Show button as disabled
+       Show message: "Alcanzaste el límite de usuarios de tu plan 
+       ({usuariosActuales}/{maxUsuarios}). Actualizá tu plan para agregar más."
+   - Show current usage in page header: 
+     "Usuarios: {usuariosActuales} / {maxUsuarios}"
+
+4. In /app/medicos/nuevo/page.tsx:
+   - Same user limit check — médicos count against max_usuarios
+   - If limit reached: disable "Registrar Médico" button and show same message
+
+5. Block the insert at API level too — before any INSERT into usuarios, 
+   check the count against max_usuarios and return error if exceeded:
+   
+CREATE OR REPLACE FUNCTION clinica_verificar_limite_usuarios(
+  p_empresa_id UUID
+) RETURNS BOOLEAN AS $$
+DECLARE
+  v_actual INTEGER;
+  v_max    INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO v_actual 
+  FROM usuarios 
+  WHERE empresa_id = p_empresa_id AND activo = TRUE;
+  
+  SELECT max_usuarios INTO v_max 
+  FROM empresas WHERE id = p_empresa_id;
+  
+  RETURN v_actual < v_max;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+6. All messages in Spanish guatemalteco
+7. Use Clinical Trust design system from CLAUDE.md
+
+Ejecutá los 5 pasos en orden — el 1 y 2 son base para el 3 y 4. ¿Arrancamos?antes de esta paso tan importante, quiero hacer copia en github1:37 p. m.Muy buena decisión antes de un cambio tan estructural. Dale este prompt a Claude Code:
+
+Commit all current work to GitHub:
+
+1. Check git status to see all pending changes
+2. Add all files: git add -A
+3. Commit with message: "feat: módulos médicos, contabilidad, file attachments, 
+   logo clínica, tax config, SucursalSelector global - previo a RBAC"
+4. Push to origin main (or current branch)
+
+Show me the output of each command so I can confirm everything uploaded correctly.
+
+Cuando confirmes que el push fue exitoso, arrancamos con el PASO 1 del RBAC sin riesgo.lo hizo?1:39 p. m.Sí, perfecto. Todo subió correctamente:
+
+63 archivos commiteados y pusheados a origin/main
+Repositorio: arturoramirez-code/Clinicaapp.git
+Historial limpio con 3 commits:
+
+8685516 — Initial commit
+df016cf — Schema Supabase
+19a0355 — Todo el trabajo actual (previo a RBAC)
+
+
+
+Tenés un punto de restauración limpio. Si el RBAC rompe algo, un git revert 19a0355 te regresa aquí.
+Arrancamos con PASO 1 — la tabla y función SQL del RBAC. Copiá el prompt del Paso 1 en Claude Code.nos quedamos hasta aqui por hoy, recuerda lo pendiente para otra sesion1:40 p. m.Se usaron 3 herramientasSe usaron 3 herramientasListo. Resumen de lo que dejamos para la próxima sesión:
+Inmediato — RBAC + Subscription limits (prompts ya redactados, listos para pegar en Claude Code):
+
+Paso 1: Tabla rol_permisos + clinica_inicializar_permisos() en Supabase
+Paso 2: Hook usePermisos + PermisosContext + ProtectedRoute + PermisoGuard
+Paso 3: Aplicar guards en todas las páginas y sidebar
+Paso 4: UI de configuración de permisos para tenant admin
+Paso 5: useLimitesSuscripcion + guards en sucursales/usuarios/médicos
+
+Siguiente — Reportes (facturación + inventario, prompts también listos)
+Después — Notificaciones (Email Brevo + WhatsApp CallMeBot)
+Punto de restauración en GitHub: commit 19a0355. Buena sesión hoy — cerraste 6 módulos completos.

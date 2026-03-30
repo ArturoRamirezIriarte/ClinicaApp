@@ -7,6 +7,7 @@ import { EMPRESA_ID } from '@/lib/config'
 import RecetaPDF from '@/components/RecetaPDF'
 import type { RecetaPDFProps } from '@/components/RecetaPDF'
 import SeccionArchivos from '@/components/SeccionArchivos'
+import PermisoGuard from '@/components/PermisoGuard'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -698,14 +699,16 @@ export default function ExpedienteCita({ citaId }: { citaId: string }) {
           )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              type="submit"
-              className="ct-btn ct-btn-primary"
-              disabled={guardandoNota}
-              style={{ opacity: guardandoNota ? 0.5 : 1 }}
-            >
-              {guardandoNota ? 'Guardando...' : notaId ? 'Actualizar nota' : 'Guardar nota'}
-            </button>
+            <PermisoGuard modulo="expediente" accion="crear">
+              <button
+                type="submit"
+                className="ct-btn ct-btn-primary"
+                disabled={guardandoNota}
+                style={{ opacity: guardandoNota ? 0.5 : 1 }}
+              >
+                {guardandoNota ? 'Guardando...' : notaId ? 'Actualizar nota' : 'Guardar nota'}
+              </button>
+            </PermisoGuard>
           </div>
         </form>
       </div>

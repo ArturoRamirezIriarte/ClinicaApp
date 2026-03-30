@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { EMPRESA_ID } from '@/lib/config'
+import PermisoGuard from '@/components/PermisoGuard'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -459,10 +460,12 @@ function SeccionClinica() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button onClick={guardar} disabled={guardando} className="ct-btn ct-btn-primary"
-          style={{ opacity: guardando ? 0.6 : 1 }}>
-          {guardando ? 'Guardando...' : 'Guardar cambios'}
-        </button>
+        <PermisoGuard modulo="configuracion" accion="ver">
+          <button onClick={guardar} disabled={guardando} className="ct-btn ct-btn-primary"
+            style={{ opacity: guardando ? 0.6 : 1 }}>
+            {guardando ? 'Guardando...' : 'Guardar cambios'}
+          </button>
+        </PermisoGuard>
       </div>
     </div>
   )
@@ -535,12 +538,14 @@ function SeccionSucursales() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h2 style={{ fontSize: 18, fontWeight: 600, color: '#0d3d6e', margin: 0 }}>Sucursales</h2>
-        <button
-          onClick={() => { setNuevo(true); setEditando({ id: '', nombre: '', direccion: null, telefono: null, email: null, es_principal: false, activa: true }) }}
-          className="ct-btn ct-btn-primary ct-btn-sm"
-        >
-          + Nueva sucursal
-        </button>
+        <PermisoGuard modulo="configuracion" accion="ver">
+          <button
+            onClick={() => { setNuevo(true); setEditando({ id: '', nombre: '', direccion: null, telefono: null, email: null, es_principal: false, activa: true }) }}
+            className="ct-btn ct-btn-primary ct-btn-sm"
+          >
+            + Nueva sucursal
+          </button>
+        </PermisoGuard>
       </div>
 
       <MensajeExito texto={exito} />
@@ -707,9 +712,11 @@ function SeccionUsuarios() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h2 style={{ fontSize: 18, fontWeight: 600, color: '#0d3d6e', margin: 0 }}>Usuarios y Roles</h2>
-        <button onClick={() => setMostrarForm(true)} className="ct-btn ct-btn-primary ct-btn-sm">
-          + Nuevo usuario
-        </button>
+        <PermisoGuard modulo="configuracion" accion="ver">
+          <button onClick={() => setMostrarForm(true)} className="ct-btn ct-btn-primary ct-btn-sm">
+            + Nuevo usuario
+          </button>
+        </PermisoGuard>
       </div>
 
       <MensajeExito texto={exito} />
@@ -868,10 +875,12 @@ function SeccionTratamientos() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h2 style={{ fontSize: 18, fontWeight: 600, color: '#0d3d6e', margin: 0 }}>Tratamientos</h2>
-        <button onClick={() => { setEsNuevo(true); setEditando({ ...vacio }) }}
-          className="ct-btn ct-btn-primary ct-btn-sm">
-          + Nuevo tratamiento
-        </button>
+        <PermisoGuard modulo="configuracion" accion="ver">
+          <button onClick={() => { setEsNuevo(true); setEditando({ ...vacio }) }}
+            className="ct-btn ct-btn-primary ct-btn-sm">
+            + Nuevo tratamiento
+          </button>
+        </PermisoGuard>
       </div>
 
       <MensajeExito texto={exito} />
@@ -1130,10 +1139,12 @@ function SeccionNotificaciones() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button onClick={guardar} disabled={guardando} className="ct-btn ct-btn-primary"
-          style={{ opacity: guardando ? 0.6 : 1 }}>
-          {guardando ? 'Guardando...' : 'Guardar configuración'}
-        </button>
+        <PermisoGuard modulo="configuracion" accion="ver">
+          <button onClick={guardar} disabled={guardando} className="ct-btn ct-btn-primary"
+            style={{ opacity: guardando ? 0.6 : 1 }}>
+            {guardando ? 'Guardando...' : 'Guardar configuración'}
+          </button>
+        </PermisoGuard>
       </div>
     </div>
   )
@@ -1273,10 +1284,12 @@ function SeccionFel() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button onClick={guardar} disabled={guardando} className="ct-btn ct-btn-primary"
-          style={{ opacity: guardando ? 0.6 : 1 }}>
-          {guardando ? 'Guardando...' : 'Guardar configuración FEL'}
-        </button>
+        <PermisoGuard modulo="configuracion" accion="ver">
+          <button onClick={guardar} disabled={guardando} className="ct-btn ct-btn-primary"
+            style={{ opacity: guardando ? 0.6 : 1 }}>
+            {guardando ? 'Guardando...' : 'Guardar configuración FEL'}
+          </button>
+        </PermisoGuard>
       </div>
     </div>
   )

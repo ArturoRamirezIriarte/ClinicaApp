@@ -40,16 +40,16 @@ interface KPIs {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function hoy(): { inicio: string; fin: string; label: string } {
-  const ahora = new Date()
-  const inicio = new Date(ahora)
-  inicio.setHours(0, 0, 0, 0)
-  const fin = new Date(ahora)
-  fin.setHours(23, 59, 59, 999)
-  const label = ahora.toLocaleDateString('es-GT', {
+function hoy(): { inicio: string; fin: string; label: string; fecha: string } {
+  // Fecha actual explícitamente en zona horaria de Guatemala (UTC-6, sin cambio de horario)
+  const fecha = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guatemala' }).format(new Date())
+  const inicio = new Date(`${fecha}T00:00:00-06:00`)
+  const fin    = new Date(`${fecha}T23:59:59.999-06:00`)
+  const label  = inicio.toLocaleDateString('es-GT', {
+    timeZone: 'America/Guatemala',
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
   })
-  return { inicio: inicio.toISOString(), fin: fin.toISOString(), label }
+  return { inicio: inicio.toISOString(), fin: fin.toISOString(), label, fecha }
 }
 
 function formatHora(iso: string): string {
@@ -137,7 +137,7 @@ export default function DashboardInicio() {
         supabase.from('cobros').select('total')
           .eq('empresa_id', EMPRESA_ID)
           .eq('estado', 'pagado')
-          .eq('fecha_cobro', new Date().toISOString().split('T')[0]),
+          .eq('fecha_cobro', diaHoy.fecha),
         supabase.from('cobros').select('*', { count: 'exact', head: true })
           .eq('empresa_id', EMPRESA_ID)
           .eq('fel_estado', 'pendiente'),

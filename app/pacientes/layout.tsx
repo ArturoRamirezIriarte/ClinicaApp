@@ -1,4 +1,5 @@
 import Sidebar from '@/components/Sidebar'
+import ProtectedRoute from '@/components/ProtectedRoute'
 
 export default function LayoutPacientes({
   children,
@@ -56,7 +57,9 @@ export default function LayoutPacientes({
             width: '100%',
           }}
         >
-          {children}
+          <ProtectedRoute modulo="pacientes">
+            {children}
+          </ProtectedRoute>
         </main>
       </div>
     </div>

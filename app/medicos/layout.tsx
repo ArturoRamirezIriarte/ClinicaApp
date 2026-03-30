@@ -1,4 +1,5 @@
 import Sidebar from '@/components/Sidebar'
+import ProtectedRoute from '@/components/ProtectedRoute'
 
 export default function LayoutMedicos({ children }: { children: React.ReactNode }) {
   return (
@@ -34,7 +35,9 @@ export default function LayoutMedicos({ children }: { children: React.ReactNode 
         </header>
 
         <main style={{ flex: 1, padding: 24, background: '#f7faff', maxWidth: 1200, width: '100%' }}>
-          {children}
+          <ProtectedRoute modulo="medicos">
+            {children}
+          </ProtectedRoute>
         </main>
       </div>
     </div>

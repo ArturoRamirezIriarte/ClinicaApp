@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { EMPRESA_ID } from '@/lib/config'
+import PermisoGuard from '@/components/PermisoGuard'
 
 // ── Constantes de layout FDI ────────────────────────────────────────────────
 
@@ -870,26 +871,28 @@ export default function Odontograma({ pacienteId }: { pacienteId: string }) {
       </div>
 
       {/* Botón guardar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
-        <button
-          onClick={guardar}
-          disabled={guardando || dirty.size === 0 || !dentistaId}
-          className="ct-btn ct-btn-primary"
-          style={{ opacity: (guardando || dirty.size === 0) ? 0.5 : 1 }}
-        >
-          {guardando ? 'Guardando...' : `Guardar Odontograma${dirty.size > 0 ? ` (${dirty.size})` : ''}`}
-        </button>
-        {dirty.size > 0 && !guardando && (
-          <span style={{ fontSize: 12, color: '#7a5500', background: '#fff8e8', border: '0.5px solid #f0c040', padding: '3px 10px', borderRadius: 20 }}>
-            {dirty.size} diente{dirty.size !== 1 ? 's' : ''} con cambios pendientes
-          </span>
-        )}
-        {exitoGuardar && (
-          <span style={{ fontSize: 12, color: '#0a5535', background: '#e8fff5', border: '0.5px solid #2ecc8a', padding: '3px 10px', borderRadius: 20 }}>
-            Odontograma guardado correctamente.
-          </span>
-        )}
-      </div>
+      <PermisoGuard modulo="odontograma" accion="editar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
+          <button
+            onClick={guardar}
+            disabled={guardando || dirty.size === 0 || !dentistaId}
+            className="ct-btn ct-btn-primary"
+            style={{ opacity: (guardando || dirty.size === 0) ? 0.5 : 1 }}
+          >
+            {guardando ? 'Guardando...' : `Guardar Odontograma${dirty.size > 0 ? ` (${dirty.size})` : ''}`}
+          </button>
+          {dirty.size > 0 && !guardando && (
+            <span style={{ fontSize: 12, color: '#7a5500', background: '#fff8e8', border: '0.5px solid #f0c040', padding: '3px 10px', borderRadius: 20 }}>
+              {dirty.size} diente{dirty.size !== 1 ? 's' : ''} con cambios pendientes
+            </span>
+          )}
+          {exitoGuardar && (
+            <span style={{ fontSize: 12, color: '#0a5535', background: '#e8fff5', border: '0.5px solid #2ecc8a', padding: '3px 10px', borderRadius: 20 }}>
+              Odontograma guardado correctamente.
+            </span>
+          )}
+        </div>
+      </PermisoGuard>
 
       {/* Panel de historial */}
       <PanelHistorial

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { EMPRESA_ID } from '@/lib/config'
 import ModalCierreCaja from '@/components/ModalCierreCaja'
+import PermisoGuard from '@/components/PermisoGuard'
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -226,20 +227,24 @@ export default function ListaCobros() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            className="ct-btn ct-btn-secondary"
-            onClick={() => setMostrarCierreCaja(true)}
-          >
-            🔒 Cierre de Caja
-          </button>
-          <Link href="/cobros/nuevo" className="ct-btn ct-btn-primary" style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            height: 40, padding: '0 20px', borderRadius: 8, fontSize: 14,
-            fontWeight: 500, textDecoration: 'none', color: '#fff',
-            background: '#1a6bbd', border: 'none', cursor: 'pointer',
-          }}>
-            + Nuevo Cobro
-          </Link>
+          <PermisoGuard modulo="caja" accion="ver">
+            <button
+              className="ct-btn ct-btn-secondary"
+              onClick={() => setMostrarCierreCaja(true)}
+            >
+              🔒 Cierre de Caja
+            </button>
+          </PermisoGuard>
+          <PermisoGuard modulo="cobros" accion="crear">
+            <Link href="/cobros/nuevo" className="ct-btn ct-btn-primary" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              height: 40, padding: '0 20px', borderRadius: 8, fontSize: 14,
+              fontWeight: 500, textDecoration: 'none', color: '#fff',
+              background: '#1a6bbd', border: 'none', cursor: 'pointer',
+            }}>
+              + Nuevo Cobro
+            </Link>
+          </PermisoGuard>
         </div>
       </div>
 

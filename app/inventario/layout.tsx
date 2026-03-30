@@ -1,4 +1,5 @@
 import Sidebar from '@/components/Sidebar'
+import ProtectedRoute from '@/components/ProtectedRoute'
 
 export default function LayoutInventario({
   children,
@@ -39,7 +40,9 @@ export default function LayoutInventario({
           flex: 1, padding: 24, background: '#f7faff',
           maxWidth: 1200, width: '100%',
         }}>
-          {children}
+          <ProtectedRoute modulo="inventario">
+            {children}
+          </ProtectedRoute>
         </main>
       </div>
     </div>

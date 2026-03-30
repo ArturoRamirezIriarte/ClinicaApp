@@ -1,4 +1,5 @@
 import Sidebar from '@/components/Sidebar'
+import ProtectedRoute from '@/components/ProtectedRoute'
 
 export default function LayoutExpedientes({
   children,
@@ -45,7 +46,9 @@ export default function LayoutExpedientes({
             maxWidth: 1200, width: '100%',
           }}
         >
-          {children}
+          <ProtectedRoute modulo="expediente">
+            {children}
+          </ProtectedRoute>
         </main>
       </div>
     </div>
