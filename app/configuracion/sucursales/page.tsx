@@ -17,6 +17,11 @@ interface Sucursal {
   activa: boolean
 }
 
+interface LimitesSucursal {
+  max: number
+  plan: string
+}
+
 // ── Helpers de estilo ─────────────────────────────────────────────────────────
 
 const inputStyle: React.CSSProperties = {
@@ -44,21 +49,35 @@ function Campo({ label, requerido, children }: { label: string; requerido?: bool
 
 export default function PaginaSucursales() {
   const [sucursales, setSucursales] = useState<Sucursal[]>([])
+  const [limites, setLimites]       = useState<LimitesSucursal | null>(null)
   const [editando, setEditando]     = useState<Sucursal | null>(null)
   const [guardando, setGuardando]   = useState(false)
   const [exito, setExito]           = useState<string | null>(null)
   const [error, setError]           = useState<string | null>(null)
   const [nuevo, setNuevo]           = useState(false)
 
-
   useEffect(() => {
-    supabase
-      .from('sucursales')
-      .select('id, nombre, direccion, telefono, email, es_principal, activa')
-      .eq('empresa_id', EMPRESA_ID)
-      .order('es_principal', { ascending: false })
-      .order('nombre')
-      .then(({ data }) => setSucursales((data as Sucursal[]) ?? []))
+    Promise.all([
+      supabase
+        .from('sucursales')
+        .select('id, nombre, direccion, telefono, email, es_principal, activa')
+        .eq('empresa_id', EMPRESA_ID)
+        .order('es_principal', { ascending: false })
+        .order('nombre'),
+      supabase
+        .from('empresas')
+        .select('max_sucursales, plan')
+        .eq('id', EMPRESA_ID)
+        .single(),
+    ]).then(([{ data: dataSuc }, { data: dataEmp }]) => {
+      setSucursales((dataSuc as Sucursal[]) ?? [])
+      if (dataEmp) {
+        setLimites({
+          max:  (dataEmp as { max_sucursales: number; plan: string }).max_sucursales,
+          plan: (dataEmp as { max_sucursales: number; plan: string }).plan,
+        })
+      }
+    })
   }, [])
 
   // ── Guardar ────────────────────────────────────────────────────────────────
@@ -116,15 +135,18 @@ export default function PaginaSucursales() {
     if (!err) setSucursales((prev) => prev.map((s) => s.id === suc.id ? { ...s, activa: !s.activa } : s))
   }
 
+  // ── Lógica de límite ───────────────────────────────────────────────────────
+
+  const conteoActivas   = sucursales.filter((s) => s.activa).length
+  const limiteSuperado  = limites !== null && conteoActivas >= limites.max
+
   function abrirNueva() {
+    if (limiteSuperado) return
     setNuevo(true)
     setEditando({ id: '', nombre: '', direccion: null, telefono: null, email: null, es_principal: false, activa: true })
     setError(null)
     setExito(null)
   }
-
-  // ── Lógica de límite ───────────────────────────────────────────────────────
-
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -140,18 +162,44 @@ export default function PaginaSucursales() {
       </nav>
 
       {/* Encabezado */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 600, color: '#0d3d6e', margin: 0 }}>Sucursales</h1>
+          {limites !== null && (
+            <p style={{ fontSize: 13, color: '#5a8ab0', margin: '4px 0 0' }}>
+              Sucursales: {conteoActivas} de {limites.max}
+            </p>
+          )}
         </div>
 
         <button
           onClick={abrirNueva}
+          disabled={limiteSuperado}
           className="ct-btn ct-btn-primary"
+          style={limiteSuperado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
         >
           + Nueva sucursal
         </button>
       </div>
+
+      {/* Banner de límite alcanzado */}
+      {limiteSuperado && (
+        <div style={{
+          background: '#fff8e8',
+          border: '0.5px solid #f0c040',
+          borderRadius: 8,
+          padding: '12px 16px',
+          color: '#7a5500',
+          fontSize: 13,
+          marginBottom: 16,
+          marginTop: 12,
+        }}>
+          Ha alcanzado el límite de {limites!.max} sucursal(es) de su plan {limites!.plan}. Contáctenos para actualizar su suscripción.
+        </div>
+      )}
+
+      {/* Separador antes de mensajes */}
+      <div style={{ marginTop: limiteSuperado ? 0 : 16 }} />
 
       {/* Mensajes */}
       {exito && (

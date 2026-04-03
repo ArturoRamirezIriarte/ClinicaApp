@@ -16,6 +16,11 @@ interface Usuario {
   activo: boolean
 }
 
+interface LimitesUsuario {
+  max: number
+  plan: string
+}
+
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 const ROLES = [
@@ -48,6 +53,7 @@ const FORM_INICIAL = { nombre: '', apellido: '', email: '', rol: 'recepcionista'
 
 export default function PaginaUsuarios() {
   const [usuarios, setUsuarios]         = useState<Usuario[]>([])
+  const [limites, setLimites]           = useState<LimitesUsuario | null>(null)
   const [mostrarForm, setMostrarForm]   = useState(false)
   const [form, setForm]                 = useState(FORM_INICIAL)
   const [guardando, setGuardando]       = useState(false)
@@ -55,12 +61,26 @@ export default function PaginaUsuarios() {
   const [error, setError]               = useState<string | null>(null)
 
   useEffect(() => {
-    supabase
-      .from('usuarios')
-      .select('id, nombre, apellido, email, rol, activo')
-      .eq('empresa_id', EMPRESA_ID)
-      .order('nombre')
-      .then(({ data }) => setUsuarios((data as Usuario[]) ?? []))
+    Promise.all([
+      supabase
+        .from('usuarios')
+        .select('id, nombre, apellido, email, rol, activo')
+        .eq('empresa_id', EMPRESA_ID)
+        .order('nombre'),
+      supabase
+        .from('empresas')
+        .select('max_usuarios, plan')
+        .eq('id', EMPRESA_ID)
+        .single(),
+    ]).then(([{ data: dataUsr }, { data: dataEmp }]) => {
+      setUsuarios((dataUsr as Usuario[]) ?? [])
+      if (dataEmp) {
+        setLimites({
+          max:  (dataEmp as { max_usuarios: number; plan: string }).max_usuarios,
+          plan: (dataEmp as { max_usuarios: number; plan: string }).plan,
+        })
+      }
+    })
   }, [])
 
   // ── Crear usuario ──────────────────────────────────────────────────────────
@@ -107,6 +127,11 @@ export default function PaginaUsuarios() {
     if (!err) setUsuarios((prev) => prev.map((x) => x.id === u.id ? { ...x, activo: !x.activo } : x))
   }
 
+  // ── Lógica de límite ───────────────────────────────────────────────────────
+
+  const conteoActivos  = usuarios.filter((u) => u.activo).length
+  const limiteSuperado = limites !== null && conteoActivos >= limites.max
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -121,18 +146,44 @@ export default function PaginaUsuarios() {
       </nav>
 
       {/* Encabezado */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 600, color: '#0d3d6e', margin: 0 }}>Usuarios y Roles</h1>
+          {limites !== null && (
+            <p style={{ fontSize: 13, color: '#5a8ab0', margin: '4px 0 0' }}>
+              Usuarios: {conteoActivos} de {limites.max}
+            </p>
+          )}
         </div>
 
         <button
           onClick={() => { setMostrarForm(true); setError(null); setExito(null) }}
+          disabled={limiteSuperado}
           className="ct-btn ct-btn-primary"
+          style={limiteSuperado ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
         >
           + Nuevo usuario
         </button>
       </div>
+
+      {/* Banner de límite alcanzado */}
+      {limiteSuperado && (
+        <div style={{
+          background: '#fff8e8',
+          border: '0.5px solid #f0c040',
+          borderRadius: 8,
+          padding: '12px 16px',
+          color: '#7a5500',
+          fontSize: 13,
+          marginBottom: 16,
+          marginTop: 12,
+        }}>
+          Ha alcanzado el límite de {limites!.max} usuario(s) de su plan {limites!.plan}. Contáctenos para actualizar su suscripción.
+        </div>
+      )}
+
+      {/* Separador antes de mensajes */}
+      <div style={{ marginTop: limiteSuperado ? 0 : 16 }} />
 
       {/* Mensajes */}
       {exito && (
@@ -208,7 +259,7 @@ export default function PaginaUsuarios() {
       </div>
 
       {/* Formulario nuevo usuario */}
-      {mostrarForm && (
+      {mostrarForm && !limiteSuperado && (
         <div className="ct-card">
           <div style={{ fontSize: 15, fontWeight: 600, color: '#0d3d6e', marginBottom: 16 }}>
             Nuevo usuario
