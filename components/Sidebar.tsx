@@ -1,29 +1,51 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { leerPermisos, type Modulo } from '@/lib/permisos'
+import { supabase } from '@/lib/supabase'
+
+// ── Tipos ──────────────────────────────────────────────────────────────────
 
 interface ItemNav {
   href: string
   etiqueta: string
   icono: string
+  modulo: Modulo
 }
 
+// ── Items de navegación ────────────────────────────────────────────────────
+
 const itemsNav: ItemNav[] = [
-  { href: '/inicio',       icono: '⊞', etiqueta: 'Inicio'        },
-  { href: '/pacientes',    icono: '👤', etiqueta: 'Pacientes'     },
-  { href: '/medicos',      icono: '🩺', etiqueta: 'Médicos'       },
-  { href: '/citas',        icono: '📅', etiqueta: 'Citas'         },
-  { href: '/expedientes',  icono: '📋', etiqueta: 'Expedientes'   },
-  { href: '/cobros',       icono: '💳', etiqueta: 'Cobros'        },
-  { href: '/contabilidad', icono: '🧮', etiqueta: 'Contabilidad'  },
-  { href: '/inventario',   icono: '📦', etiqueta: 'Inventario'    },
-  { href: '/reportes',      icono: '📊', etiqueta: 'Reportes'      },
-  { href: '/configuracion',icono: '⚙',  etiqueta: 'Configuración' },
+  { href: '/inicio',       icono: '⊞', etiqueta: 'Inicio',        modulo: 'dashboard'     },
+  { href: '/pacientes',    icono: '👤', etiqueta: 'Pacientes',     modulo: 'pacientes'     },
+  { href: '/medicos',      icono: '🩺', etiqueta: 'Médicos',       modulo: 'medicos'       },
+  { href: '/citas',        icono: '📅', etiqueta: 'Citas',         modulo: 'agenda'        },
+  { href: '/expedientes',  icono: '📋', etiqueta: 'Expedientes',   modulo: 'expediente'    },
+  { href: '/cobros',       icono: '💳', etiqueta: 'Cobros',        modulo: 'cobros'        },
+  { href: '/contabilidad', icono: '🧮', etiqueta: 'Contabilidad',  modulo: 'contabilidad'  },
+  { href: '/inventario',   icono: '📦', etiqueta: 'Inventario',    modulo: 'inventario'    },
+  { href: '/reportes',     icono: '📊', etiqueta: 'Reportes',      modulo: 'reportes'      },
+  { href: '/configuracion',icono: '⚙',  etiqueta: 'Configuración', modulo: 'configuracion' },
 ]
+
+// ── Componente ─────────────────────────────────────────────────────────────
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const router   = useRouter()
+
+  // Leer permisos de localStorage de forma síncrona — sin useEffect, sin loading
+  const permisos = leerPermisos()
+  const itemsVisibles = itemsNav.filter((item) => permisos.modulos[item.modulo])
+
+  // ── Cerrar sesión ────────────────────────────────────────────────────────
+  async function cerrarSesion() {
+    localStorage.removeItem('clinica_permisos')
+    localStorage.removeItem('clinica_usuario')
+    await supabase.auth.signOut()
+    router.replace('/login')
+  }
 
   return (
     <aside className="ct-sidebar flex flex-col">
@@ -53,7 +75,7 @@ export default function Sidebar() {
 
       {/* Navegación */}
       <nav className="flex-1 py-4">
-        {itemsNav.map((item) => {
+        {itemsVisibles.map((item) => {
           const esActivo = pathname === item.href || (
             item.href !== '/configuracion' && pathname.startsWith(item.href)
           ) || (
@@ -107,11 +129,40 @@ export default function Sidebar() {
         style={{
           padding: '12px 16px',
           borderTop: '0.5px solid rgba(255,255,255,0.08)',
-          color: '#5a8ab0',
-          fontSize: 12,
         }}
       >
-        Plan Trial · 30 días restantes
+        <div style={{ color: '#5a8ab0', fontSize: 12, marginBottom: 8 }}>
+          Plan Trial · 30 días restantes
+        </div>
+        <button
+          onClick={cerrarSesion}
+          style={{
+            width: '100%',
+            height: 32,
+            background: 'transparent',
+            border: '0.5px solid rgba(255,255,255,0.15)',
+            borderRadius: 8,
+            color: '#a8c8e8',
+            fontSize: 12,
+            fontWeight: 500,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
+            e.currentTarget.style.color = '#ffffff'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = '#a8c8e8'
+          }}
+        >
+          <span style={{ fontSize: 13 }}>⎋</span>
+          Cerrar sesión
+        </button>
       </div>
     </aside>
   )

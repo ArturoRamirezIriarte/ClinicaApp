@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { cargarYGuardarPermisos } from '@/lib/cargarPermisos'
 
 // ── Helpers de estilo ─────────────────────────────────────────────────────────
 
@@ -11,7 +12,9 @@ const inputStyle: React.CSSProperties = {
   height: 40,
   padding: '0 12px',
   fontSize: 14,
-  border: '0.5px solid #c5ddf5',
+  borderWidth: '0.5px',
+  borderStyle: 'solid',
+  borderColor: '#c5ddf5',
   borderRadius: 8,
   background: '#ffffff',
   color: '#0d3d6e',
@@ -61,7 +64,7 @@ export default function PaginaLogin() {
 
     setCargando(true)
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email:    email.trim(),
         password: password,
       })
@@ -78,6 +81,25 @@ export default function PaginaLogin() {
           setError('Ocurrió un error al iniciar sesión. Por favor intentá de nuevo.')
         }
         return
+      }
+
+      // Obtener datos del usuario y cargar permisos antes de redirigir
+      if (authData.user) {
+        const { data: usuario } = await supabase
+          .from('usuarios')
+          .select('empresa_id, rol, nombre, apellido, email')
+          .eq('supabase_uid', authData.user.id)
+          .single()
+
+        if (usuario) {
+          await cargarYGuardarPermisos(usuario.empresa_id, usuario.rol)
+          localStorage.setItem('clinica_usuario', JSON.stringify({
+            nombre:   usuario.nombre,
+            apellido: usuario.apellido || '',
+            rol:      usuario.rol,
+            email:    usuario.email,
+          }))
+        }
       }
 
       router.replace('/inicio')
