@@ -18,6 +18,7 @@ const itemsNav: ItemNav[] = [
   { href: '/cobros',       icono: '💳', etiqueta: 'Cobros'        },
   { href: '/contabilidad', icono: '🧮', etiqueta: 'Contabilidad'  },
   { href: '/inventario',   icono: '📦', etiqueta: 'Inventario'    },
+  { href: '/reportes',      icono: '📊', etiqueta: 'Reportes'      },
   { href: '/configuracion',icono: '⚙',  etiqueta: 'Configuración' },
 ]
 
