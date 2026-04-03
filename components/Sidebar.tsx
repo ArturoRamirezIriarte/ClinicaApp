@@ -120,6 +120,14 @@ export default function Sidebar() {
               <span style={{ fontSize: 13, width: 20, textAlign: 'center' }}>🔔</span>
               <span>Notificaciones</span>
             </Link>
+            <Link
+              href="/configuracion/permisos"
+              className={`ct-sidebar-item${pathname.startsWith('/configuracion/permisos') ? ' activo' : ''}`}
+              style={{ paddingLeft: 44, fontSize: 13 }}
+            >
+              <span style={{ fontSize: 13, width: 20, textAlign: 'center' }}>🔐</span>
+              <span>Permisos</span>
+            </Link>
           </>
         )}
       </nav>
