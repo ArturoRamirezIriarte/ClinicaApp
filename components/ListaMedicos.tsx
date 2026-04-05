@@ -14,7 +14,7 @@ interface MedicoFila {
   email: string
   activo: boolean
   sucursal_id: string | null
-  sucursales: { nombre: string } | null
+  sucursales: { nombre: string }[] | null
 }
 
 interface Medico {
@@ -76,7 +76,7 @@ export default function ListaMedicos({ registrado }: { registrado?: boolean }) {
           apellido:       u.apellido,
           email:          u.email,
           activo:         u.activo,
-          sucursal_nombre: u.sucursales?.nombre ?? null,
+          sucursal_nombre: u.sucursales?.[0]?.nombre ?? null,
         }))
         setMedicos(lista)
       } catch (e) {
