@@ -15,8 +15,8 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = {
-      sender: { name: 'ClinicaApp Contacto', email: 'noreply@clinicaapp.com' },
-      to: [{ email: 'contacto@clinicaapp.com', name: 'ClinicaApp' }],
+      sender: { name: 'ClinicaApp Contacto', email: 'noreply@cliniaapp.com' },
+      to: [{ email: 'contacto@cliniaapp.com', name: 'ClinicaApp' }],
       replyTo: { email, name: nombre },
       subject: `Nuevo contacto desde ClinicaApp - ${plan}`,
       htmlContent: `

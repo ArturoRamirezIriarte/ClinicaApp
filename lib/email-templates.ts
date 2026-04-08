@@ -29,7 +29,7 @@ function layoutBase(clinica: string, contenido: string): string {
           <tr>
             <td style="background-color:#f4f6f9;padding:20px 32px;text-align:center;border-top:1px solid #e8e8e8;">
               <p style="margin:0;font-size:12px;color:#888888;">
-                Este mensaje fue enviado por <strong>ClinicaApp</strong> · clinicaapp.com
+                Este mensaje fue enviado por <strong>ClinicaApp</strong> · cliniaapp.com
               </p>
               <p style="margin:6px 0 0;font-size:11px;color:#aaaaaa;">
                 Si no solicitó esta información, puede ignorar este correo.

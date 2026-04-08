@@ -643,8 +643,8 @@ export default function LandingPage() {
                 </div>
                 <div>
                   <p className="text-[12px] text-gray-400 font-medium">Email</p>
-                  <a href="mailto:contacto@clinicaapp.com" className="text-[14px] text-gray-900 font-semibold hover:text-[#0A6E5A] transition-colors">
-                    contacto@clinicaapp.com
+                  <a href="mailto:contacto@cliniaapp.com" className="text-[14px] text-gray-900 font-semibold hover:text-[#0A6E5A] transition-colors">
+                    contacto@cliniaapp.com
                   </a>
                 </div>
               </div>
@@ -699,10 +699,10 @@ export default function LandingPage() {
           <div>
             <h4 className="font-semibold text-white text-[13px] mb-4">Contacto</h4>
             <a
-              href="mailto:contacto@clinicaapp.com"
+              href="mailto:contacto@cliniaapp.com"
               className="text-gray-400 text-[13px] hover:text-white transition-colors"
             >
-              contacto@clinicaapp.com
+              contacto@cliniaapp.com
             </a>
             <p className="text-gray-600 text-[12px] mt-4">Guatemala · Facturación electrónica local</p>
           </div>
