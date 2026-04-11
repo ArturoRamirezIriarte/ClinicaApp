@@ -608,7 +608,8 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-10">
             <p className="text-[#0A6E5A] font-semibold text-[13px] uppercase tracking-widest mb-3">Planes</p>
-            <h2 className="font-bold text-3xl text-gray-900 mb-5">Elige el plan para tu clínica</h2>
+            <h2 className="font-bold text-3xl text-gray-900 mb-2">Planes simples para hacer crecer tu clínica</h2>
+            <p className="text-[#5a8ab0] text-[15px] mb-5">Ahorra tiempo, mejora la atención y automatiza tu clínica con herramientas inteligentes.</p>
             <a
               href="#contacto"
               className="inline-flex items-center h-11 px-6 rounded-lg bg-[#2ecc8a] text-white text-[15px] font-semibold hover:bg-[#25b578] transition-colors mb-4"
@@ -623,7 +624,9 @@ export default function LandingPage() {
               <span>Sin tarjeta de crédito</span>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+
+          {/* 3-column grid: Starter, Estándar, Pro */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
             <PlanCard
               name="Starter"
               priceQTZ="Q99/mes"
@@ -650,6 +653,8 @@ export default function LandingPage() {
               name="Estándar"
               priceQTZ="Q199/mes"
               priceUSD="US$25/mes"
+              highlighted
+              badge="Más popular"
               features={[
                 { text: '1 sucursal' },
                 { text: '5 usuarios incluidos' },
@@ -666,14 +671,12 @@ export default function LandingPage() {
               ]}
               ctaLabel="Contactar ventas"
               ctaHref="mailto:contacto@cliniaapp.com?subject=Consulta%20Plan%20Estándar%20—%20ClinicaApp&body=Hola%2C%20me%20interesa%20el%20Plan%20Est%C3%A1ndar.%0A%0ANombre%3A%20%0AClínica%3A%20%0ATeléfono%3A%20"
-              ctaVariant="outline-green"
+              ctaVariant="filled-green"
             />
             <PlanCard
               name="Pro"
               priceQTZ="Q399/mes"
               priceUSD="US$50/mes"
-              highlighted
-              badge="Más popular"
               features={[
                 { text: 'Hasta 3 sucursales' },
                 { text: '5 usuarios por sucursal' },
@@ -686,27 +689,51 @@ export default function LandingPage() {
               ]}
               ctaLabel="Contactar ventas"
               ctaHref="mailto:contacto@cliniaapp.com?subject=Consulta%20Plan%20Pro%20—%20ClinicaApp&body=Hola%2C%20me%20interesa%20el%20Plan%20Pro.%0A%0ANombre%3A%20%0AClínica%3A%20%0ATeléfono%3A%20"
-              ctaVariant="filled-green"
-            />
-            <PlanCard
-              name="Enterprise"
-              priceQTZ="Precio negociado"
-              priceNegotiated
-              features={[
-                { text: 'Sucursales ilimitadas' },
-                { text: 'Usuarios negociados' },
-                { text: 'Todo el plan Pro' },
-                { text: 'Reportería ejecutiva' },
-                { text: 'Integración con sistemas existentes' },
-                { text: 'SLA garantizado' },
-                { text: 'Onboarding dedicado' },
-                { text: 'Facturación personalizada' },
-              ]}
-              ctaLabel="Hablar con ventas"
-              ctaHref="mailto:contacto@cliniaapp.com?subject=Consulta%20Plan%20Enterprise%20—%20ClinicaApp&body=Hola%2C%20me%20interesa%20el%20Plan%20Enterprise.%0A%0ANombre%3A%20%0AClínica%3A%20%0ATeléfono%3A%20"
-              ctaVariant="outline-neutral"
+              ctaVariant="outline-green"
             />
           </div>
+
+          {/* Enterprise — horizontal card */}
+          <div className="mt-4 bg-white rounded-xl border border-gray-200 p-6 grid grid-cols-1 md:grid-cols-[1fr_auto] lg:grid-cols-[260px_1fr_180px] gap-6 items-center">
+            {/* Left: name + description */}
+            <div className="lg:border-r lg:border-[#c5ddf5] lg:pr-6">
+              <h3 className="font-bold text-lg text-[#0d3d6e] mb-1">Enterprise</h3>
+              <p className="text-[13px] text-[#5a8ab0] mb-2">Para grupos clínicos grandes</p>
+              <p className="text-[18px] font-medium text-[#5a8ab0] mb-3">Precio negociado</p>
+              <p className="text-[13px] text-gray-500 leading-relaxed">
+                Soluciones personalizadas para redes de clínicas y grupos médicos con múltiples sedes.
+              </p>
+            </div>
+            {/* Center: 2-column feature grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+              {[
+                'Sucursales ilimitadas',
+                'Reportería ejecutiva',
+                'Usuarios negociados',
+                'Integración con sistemas existentes',
+                'Todo el plan Pro',
+                'SLA garantizado',
+                'Onboarding dedicado',
+                'Facturación personalizada',
+              ].map((f) => (
+                <div key={f} className="flex items-center gap-2">
+                  <IconCheck className="w-3.5 h-3.5 text-[#2ecc8a] shrink-0" />
+                  <span className="text-[13px] text-gray-700">{f}</span>
+                </div>
+              ))}
+            </div>
+            {/* Right: CTA */}
+            <div className="flex flex-col items-center gap-2 min-w-[140px]">
+              <a
+                href="mailto:contacto@cliniaapp.com?subject=Consulta%20Plan%20Enterprise%20—%20ClinicaApp&body=Hola%2C%20me%20interesa%20el%20Plan%20Enterprise.%0A%0ANombre%3A%20%0AClínica%3A%20%0ATeléfono%3A%20"
+                className="w-full py-2.5 rounded-lg border border-gray-300 text-gray-700 font-semibold text-[14px] hover:bg-gray-50 transition-colors text-center block"
+              >
+                Hablar con ventas
+              </a>
+              <p className="text-[12px] text-[#5a8ab0] text-center">Te respondemos en menos de 24 horas</p>
+            </div>
+          </div>
+
           <p className="text-center text-[12px] text-[#5a8ab0] mt-8 max-w-[700px] mx-auto">
             * Facturación electrónica FEL sujeta a integración con certificador autorizado. La clínica debe contar con contrato vigente con un certificador habilitado por SAT, o entidad regulatoria de su país.
           </p>
