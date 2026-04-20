@@ -1,14 +1,20 @@
 name: Keep Supabase alive
+
 on:
   schedule:
-    - cron: '0 0 */5 * *'
+    - cron: '0 12 */4 * *'  # cada 4 días al mediodía UTC
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase
+      - name: Ping Supabase con INSERT
         run: |
-          curl -f "${{ secrets.SUPABASE_URL }}/rest/v1/empresas?limit=1" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}"
+          curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/clinica_keepalive_ping" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}'
